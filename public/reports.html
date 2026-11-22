@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Judy — Reports</title>
+  <script>
+    try { document.documentElement.dataset.theme = localStorage.getItem("judy-theme") || "light"; } catch (e) {}
+  </script>
+  <link rel="icon" href="/judy-mark.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/judy-mark.svg" />
+  <link rel="stylesheet" href="/judy-theme.css" />
+  <style>
+    .reports-page { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1.5rem 4rem; display: grid; gap: 1rem; }
+    .reports-intro { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem 1rem; }
+    .reports-intro h1 { font-family: var(--f-display); font-size: 1.75rem; line-height: 1.2; margin: 0; }
+    .reports-intro p { margin: 0; color: var(--muted); }
+    .reports-status { color: var(--muted); }
+    .reports-status.error { color: var(--error); }
+    @media (max-width: 640px) {
+      .brand-sub { display: none; }
+      .reports-page { padding: 1rem 1rem 3rem; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <img class="brand-mark" src="/judy-mark.svg" width="32" height="32" alt="" aria-hidden="true" />
+      <span>
+        <span class="brand-word">Judy</span>
+        <span class="brand-sub">Reports</span>
+      </span>
+    </a>
+    <span class="topbar-spacer"></span>
+    <a class="btn btn-sm" href="/"><span data-icon="arrow-left"></span>Console</a>
+    <button type="button" class="btn btn-sm theme-toggle" id="themeToggle"></button>
+  </header>
+
+  <main class="reports-page">
+    <div class="reports-intro">
+      <h1>Reports</h1>
+      <p>Finished runs are saved automatically. Stopped runs are saved only if you chose to keep them.</p>
+    </div>
+
+    <section class="panel">
+      <div class="panel-head"><span class="led accent"></span>All reports<span class="aside" id="runsCount"></span></div>
+      <div class="panel-body">
+        <div id="runFilters" class="run-filters hidden"></div>
+        <ul class="runs" id="runsList"></ul>
+        <p id="runsEmpty" class="run-empty hidden"></p>
+        <p id="runsStatus" class="reports-status">Loading reports…</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="/judy-ui.js"></script>
+  <script>
+    const J = window.Judy;
+    const $ = (id) => document.getElementById(id);
+
+    for (const el of document.querySelectorAll("[data-icon]")) el.outerHTML = J.icon(el.dataset.icon);
+    J.theme.mountToggle($("themeToggle"));
+
+    const statusEl = $("runsStatus");
+    const browser = J.createRunBrowser({
+      listEl: $("runsList"),
+      filtersEl: $("runFilters"),
+      countEl: $("runsCount"),
+      emptyEl: $("runsEmpty"),
+      onDelete: (name) => J.deleteRun(name),
+    });
+
+    async function load() {
+      try {
+        const res = await fetch("/api/runs");
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        statusEl.classList.add("hidden");
+        browser.setRuns(data.runs || []);
+      } catch (err) {
+        statusEl.textContent = `Failed to load reports: ${err.message}`;
+        statusEl.classList.add("error");
+        statusEl.classList.remove("hidden");
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

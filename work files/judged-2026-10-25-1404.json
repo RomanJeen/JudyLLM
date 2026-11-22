@@ -1,0 +1,365 @@
+{
+  "version": 2,
+  "createdAt": "2026-10-25T12:04:29.232Z",
+  "updatedAt": "2026-10-25T12:04:29.331Z",
+  "complete": true,
+  "title": "Pola Eval - 2026-10-25T12:04:29.232Z",
+  "meta": {
+    "version": 1,
+    "createdAt": "2026-10-25T12:04:29.232Z",
+    "outputFile": "judged-2026-10-25-1404.json",
+    "inputFile": "miluim-tashpaz-spec-faq.xlsx",
+    "promptName": "miluim",
+    "promptSource": "miluim",
+    "tags": [
+      "miluim-tashpaz-spec-faq.xlsx",
+      "miluim"
+    ]
+  },
+  "judgePrompt": {
+    "scenario": "miluim",
+    "source": "miluim",
+    "text": "You are a senior content reviewer for the Mitve Miluim assistant at Ben-Gurion University. You grade whether the agent helped a student correctly, the way a knowledgeable human reviewer from the reserves office would. You are not checking whether the agent copied a reference text.\n\n## Inputs\n\n- Question: what the student asked. A question that starts with \"בהמשך לשאלה\" (one earlier question) or \"בהמשך לשאלות הקודמות\" (a numbered list of earlier questions) carries that earlier context; grade only the last paragraph, against the whole context. If the context says the student starts next year, the whole chain is about next year's plan.\n- Older expected answer: the gold for this question. It has up to two sections:\n  - \"תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב)\" — the customer's approved answer. It is the source of truth for what is correct. Its wording, length, structure, greetings, tips and closing lines are not required.\n  - \"הנחיית משוב\" — a reviewer instruction about how a good answer should behave (for example, ask about combat status first). When present, it is binding.\n- Human feedback: a source tag such as \"golden #N\", sometimes followed by the raw reviewer note. Ignore the tag. The note is already reflected under \"הנחיית משוב\".\n- Conversation transcript: the full chat so far. Grade only the agent's latest message, but use earlier turns as context (what the student already told the agent).\n\n## How to grade\n\nWork in this order:\n\n1. Find the core need. Decide what the student actually needs answered: the decision (eligible or not, which group, yes or no, what to do next) and the 1–4 key facts that decision depends on (thresholds, limits, the system or office to use). Everything else in the customer answer is supporting detail.\n2. Compare by meaning. Paraphrase, a different order, a shorter answer, a longer answer, quoting the official policy text, and a different structure are all fine. Synonyms count: \"אזור אישי\" and \"מערכת חרבות ברזל\" are the same portal.\n3. Check the situation.\n   - If the customer answer branches on a status (לוחם / ייעוד קדמי, degree level, STEM) and the student already stated it in the question or transcript, grade against that branch only.\n   - If the customer answer says a plan is not published yet (for example מתווה תשפ\"ז), any answer that gives groups, thresholds or entitlements for that year as if they were known is wrong.\n   - If the gold has no customer answer, or only a short reviewer remark such as \"תשובה טובה\", the answer passes unless it is off-topic or clearly wrong. Never invent requirements that are not in the gold.\n4. Apply \"הנחיית משוב\" when present.\n5. Pick the verdict.\n\n## Verdicts\n\n- NEEDS_FOLLOWUP — the latest message is mainly a clarifying question or asks for missing details (name, degree, department, status) before answering. This takes priority over every other verdict. Asking a question is never a fault and never \"הוסיף\". Write a short userReply as the student.\n- OK — the core decision is correct, the key facts are present and correct, nothing contradicts the gold, and any feedback instruction is followed.\n- PARTIAL — the core decision is correct, but one or two key facts are missing or vague, or a feedback instruction was only partly followed. The student would still be helped, but not fully.\n- FALSE — the core decision is wrong, a key fact is contradicted, the answer misses most of what the student needed, or a feedback instruction was clearly not followed (for example, it assigns a single group without asking about or mentioning combat status when the feedback requires that).\n\nSupporting detail is never a reason for FALSE:\n- Contact details, phone numbers, emails, links, names of staff, \"follow the announcements\", tips, and closing lines are supporting detail unless the question itself asks who to contact or how to reach someone. When the question does ask that, a missing contact channel can make the answer PARTIAL, not FALSE.\n- Extra information that is correct, or plausibly correct official policy, is not an error. Use \"הוסיף\" only for an added claim that is wrong, or off-topic in a way that would mislead the student.\n\n## userReply (only for NEEDS_FOLLOWUP)\n\n- Answer as the student, briefly. Prefer facts already stated in the question.\n- If the agent asks something the question does not state, invent one plausible short value that keeps the gold correct. For example, if the gold's main branch is for a non-combat student, answer \"לא לוחם\". Give a name if asked (for example \"דני\").\n- Do not paste the gold answer or detailed thresholds into userReply.\n\n## Explanation\n\n- Hebrew only, as a JSON array of short strings, one issue per item, at most 4 items.\n- Prefix each item with exactly one of: חסר / חלקי / סתירה / הוסיף.\n- Only list key misses and contradictions. Never list missing supporting detail.\n- OK: one item only — \"אין בעיות מהותיות\".\n- NEEDS_FOLLOWUP: one item describing what the agent asked.\n\n## Examples\n\nExample 1 — short correct answer, OK.\nQuestion: \"מה המתווה לשנת תשפ\"ז?\"\nGold: plan not published yet; an announcement will be sent and posted on the חרבות ברזל page; contact miluim@bgu.ac.il, 08-6472481.\nAgent: \"טרם פורסם המתווה לשנה הבאה, אפשר להתייעץ איתי לגבי מתווה של השנה הנוכחית\".\nVerdict: {\"coreNeed\": \"האם המתווה פורסם\", \"verdict\": \"OK\", \"explanation\": [\"אין בעיות מהותיות\"]}\nWhy: the core fact (not published) is correct; contacts and \"follow announcements\" are supporting detail.\n\nExample 2 — clarifying question, NEEDS_FOLLOWUP.\nQuestion: \"עשיתי יום מילואים אחד, מה מגיע לי?\"\nAgent: \"כדי לתת מענה מדויק: מה רמת התואר? באיזו מחלקה? האם את לוחמת או בייעוד קדמי?\"\nVerdict: {\"coreNeed\": \"שיוך לקבוצה והתאמות ליום מילואים אחד\", \"verdict\": \"NEEDS_FOLLOWUP\", \"explanation\": [\"הסוכן שאל על רמת תואר, מחלקה וסטטוס לוחם\"], \"userReply\": \"תואר ראשון, הנדסה, לא לוחמת\"}\n\nExample 3 — wrong core, FALSE.\nQuestion: \"אני מתחילה ללמוד בשנה הבאה, שירתתי 45 יום ביולי–ספטמבר. לאיזו קבוצה אני שייכת?\"\nGold: next year's plan is not published, so no group can be given yet.\nAgent: \"לפי המתווה תשתייכי לקבוצה 2, כי שירתת 60 יום ומעלה...\"\nVerdict: {\"coreNeed\": \"שיוך לקבוצה לשנה הבאה\", \"verdict\": \"FALSE\", \"explanation\": [\"סתירה: שייך לקבוצה 2 אף שמתווה השנה הבאה טרם פורסם\"]}\n\n## Output\n\nReply with only a JSON object, no markdown and no prose around it:\n{\"coreNeed\": \"...\", \"verdict\": \"OK\" | \"PARTIAL\" | \"FALSE\" | \"NEEDS_FOLLOWUP\", \"explanation\": [\"...\"], \"userReply\": \"...\"}\n- coreNeed: one short Hebrew phrase naming what the student needed answered.\n- userReply is required only when verdict is NEEDS_FOLLOWUP."
+  },
+  "summary": {
+    "total": 30,
+    "ok": 0,
+    "partial": 0,
+    "false": 0,
+    "error": 30,
+    "passRate": "0.0",
+    "score": "0.0"
+  },
+  "rows": [
+    {
+      "index": 1,
+      "question": "נכנסתי למערכת חרבות ברזל ומופיעה לי קבוצה לא נכונה",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nניתן לראות את השיוך לקבוצה במערכת חרבות ברזל – תפריט – קבוצת מילואים, ואז בחירת הסמסטר הרלוונטי. ייתכן ובחרת סמסטר אחר.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #1",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.285Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.285Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 2,
+      "question": "למה במערכת חרבות ברזל יש ספירה שונה בדיווח ימי מילואים ובקבוצת מילואים?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nהחישוב בדיווח ימי מילואים הוא ללא תקופת בחינות, ואילו בקבוצת מילואים החישוב כולל תקופת בחינות. על פי מכסת הימים בקבוצת המילואים וסטטוס לוחם/ייעוד קדמי, הקבוצה מחושבת בהתאם למתווה.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #2",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.289Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.289Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 3,
+      "question": "אני בצו מילואים פתוח ולא יכול להפיק אישור מזכה",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nיש לפנות לרכזות משרד המילואים בכתובת miluim@bgu.ac.il, בציון מספר תעודת זהות ושם מלא.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #3",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.296Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.296Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 4,
+      "question": "מהו מתווה סמסטר קיץ?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nטרם פורסם מתווה קיץ. עם פרסומו תופץ הודעה לסטודנטים והמידע יפורסם בדף חרבות ברזל.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #4",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.296Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.296Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 5,
+      "question": "אני בצו פתוח ולא מצליח לדווח את ימי המילואים שלי. הזכאויות שלי נפגעות.",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nיש לפנות לרכזת משרד המילואים בכתובת miluim@bgu.ac.il בצירוף שמ\"פ עדכני.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #5",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.298Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.298Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 6,
+      "question": "איך אני יודע אם אני זכאי להערכה חלופית?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nיש לבדוק בסילבוס הקורס ו/או לפנות למרצה הקורס.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #6",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.300Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.300Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 7,
+      "question": "אני לא מצליח להפיק אישור להארכת זמן",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nלזכאים יש לנסות ממחשב נייח ולבטל חלונות חוסמים.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #7",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.301Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.301Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 8,
+      "question": "למדתי באפיק מעבר ולא קיבלתי את כלל הזכאויות",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nיש לפנות לנציג המילואים של המחלקה להמשך בירור.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #8",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.303Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.303Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 9,
+      "question": "איך ניתן להשכיר נטסטיק?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nהשכרת נטסטיק היא באחריות האגודה הסטודנטיאלית. מידע נוסף: https://bgu4u.co.il/%D7%9E%D7%93%D7%95%D7%A8-%D7%90%D7%A7%D7%93%D7%9E%D7%99%D7%94/%D7%9E%D7%A9%D7%A8%D7%93-%D7%A1%D7%99%D7%95%D7%A2-%D7%90%D7%A7%D7%93%D7%9E%D7%99/%D7%9E%D7%99%D7%9C%D7%95%D7%90%D7%99%D7%9D/%D7%94%D7%A9%D7%9B%D7%A8%D7%AA-%D7%A0%D7%98%D7%A1%D7%98%D7%99%D7%A7%D7%99%D7%9D/",
+      "humanFeedback": "אפיון בוט תשפ\"ז #9",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.305Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.305Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 10,
+      "question": "למה אני אמור לשלם שכר לימוד על נק\"ז מילואים?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nהנק\"ז של שירות מילואים הם חלק מהנק\"ז של התואר, ולכן נדרש לשלם עבורם לפי שכר לימוד נורמטיבי בתואר. סטודנט שצריך לצבור סה\"כ 120 נק\"ז לתואר משלם עבור כלל הנק\"ז, גם אם חלק מהם הם נק\"ז מילואים.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #10",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.307Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.307Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 11,
+      "question": "למי אני יכול לפנות כדי לבטל קורסים?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nיש לפנות לרכזת הסטודנטים של המחלקה, בהתאם למועדים שנקבעו.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #11",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.307Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.307Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 12,
+      "question": "איך אני מבצע רישום למועד ב' או ג'?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nיש לפנות לרכזת הסטודנטים של המחלקה לבירור אודות הליך הרישום למועדים מיוחדים.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #12",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.309Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.309Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 13,
+      "question": "מה זה חוק זכויות הסטודנט?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nחוק זכויות הסטודנט הוא חוק מדינה שמגדיר את זכויות הסטודנטים ומחייב את המוסדות האקדמיים להעניק אותן לכל סטודנט וסטודנטית. בין היתר החוק כולל התייחסות לסטודנטים במילואים.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #13",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.311Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.311Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 14,
+      "question": "במה נציגי המילואים המחלקתיים יכולים לעזור לי?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nבכל מחלקה יש נציג מילואים אקדמי ומנהלי, שיכולים לסייע במענה לפניות אישיות פרטניות, מימוש זכויות או התאמות במחלקה, מענה לאתגר נקודתי, תיווך מול מרצה וכדומה.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #14",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.312Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.312Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 15,
+      "question": "מגיעה לי הארכת זמן כסטודנט לקוי למידה של 25% ושל מילואימניק של 25%. האם אני אקבל את שתי הארכות הזמן?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nלא. הארכת הזמן אינה נצברת ולא תעלה על 25% לנבחן.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #15",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.313Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.313Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 16,
+      "question": "לא שירתתי הסמסטר במילואים. האם אני זכאי לפטור מתשלום למרתון?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nתקופת המרתונים טרם נפתחה. לקראת תקופת המבחנים המידע יעודכן בדף חרבות ברזל.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #16",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.314Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.314Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 17,
+      "question": "חויבתי בתשלום למרות שרשום במתווה שאין חיוב בגלל חלקיות מערכת/ביטול מאוחר. למי ניתן לפנות?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nיש לפנות למדור חשבונות סטודנטים: https://www.bgu.ac.il/welcome/payments-lobby/",
+      "humanFeedback": "אפיון בוט תשפ\"ז #17",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.315Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.315Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 18,
+      "question": "אני משרת בסדיר. איך אני מקבל התאמות?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nבהתאם למתווה תשפ\"ז, הסיוע לאוכלוסיות מיוחדות מיועד לפצועי המלחמה, לנפגעי אירועי 7 באוקטובר, לבני משפחות של פצועים, וכן לסטודנטים וסטודנטיות שהם בני או בנות זוג של משרתי סדיר, קבע או מערכת הביטחון, אשר הם הורים לילדים עד גיל 13. על כן משרתי שירות סדיר אינם נכללים במסגרת אוכלוסיות אלו. מומלץ לפנות למחלקה האקדמית ולבדוק אם קיימות אפשרויות סיוע נוספות מטעמה, ולעיין בשירותי הסיוע באתר דקאנט הסטודנטים: https://www.bgu.ac.il/u/academic-affairs/dekanat/",
+      "humanFeedback": "אפיון בוט תשפ\"ז #18",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.317Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.317Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 19,
+      "question": "אני לומד במכינה. למה אני זכאי?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nסטודנטים משרתים הלומדים במכינה פונים ליועצות הלימודים במרכז ללימודים קדם-אקדמיים.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #19",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.318Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.318Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 20,
+      "question": "אני לומד בלימודי חוץ. למה אני זכאי?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nסטודנטים משרתים הלומדים בלימודי חוץ פונים ליועצות הלימודים במרכז האוניברסיטאי ללימודי חוץ.",
+      "humanFeedback": "אפיון בוט תשפ\"ז #20",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.319Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.319Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 21,
+      "question": "מדוע נקבע תאריך קבוע לדיווח ועדכון ימי מילואים במהלך השירות?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nעל פי נוהל המילואים ניתן לדווח ימי שירות מילואים בצירוף טופס 3010. בעקבות מלחמת חרבות ברזל, ובמטרה לאפשר לזכאים לממש את ההתאמות האקדמיות, צה\"ל מעביר לאוניברסיטה אחת לתקופה קובץ מרכז עם פרטי משרתי ומשרתות המילואים הפעילים. המערכת מתעדכנת בהתאם למידע זה, ולכן ניתן לדווח את ימי המילואים עד לתאריך שבו מתקבל הקובץ. תאריך אחרון לדיווח שמ\"פ מפורסם כאן: https://www.bgu.ac.il/welcome/mitve2026/mitve-tech/\nהמידע מתקבל רק עבור סטודנטים וסטודנטיות שעדכנו סטטוס סטודנט באתר המילואים של צה\"ל. הוראות עדכון פרטים: https://www.miluim.idf.il/articles-list/%D7%A2%D7%93%D7%9B%D7%95%D7%9F-%D7%A4%D7%A8%D7%98%D7%99%D7%9D-%D7%90%D7%99%D7%A9%D7%99%D7%99%D7%9D/\nלבירור נוסף ניתן לפנות למשרד המילואים בדיקאנט: miluim@bgu.ac.il.",
+      "humanFeedback": "שאלות נפוצות, מתווה תשפ\"ז #1\nhttps://www.bgu.ac.il/u/academic-affairs/dekanat/mitve2027/",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.320Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.320Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 22,
+      "question": "איך מחושבת קבוצה?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nסטודנטים שיעדרו בשל שירות מילואים או קבע ייעוד קדמי יסווגו לקבוצות זכאות (1 עד 5) בהתאם למספר ימי השירות שביצעו בפועל במהלך הסמסטר המזכה, למעט קבוצה 4 (300+).\nהקבוצה נקבעת בסמסטר המזכה וניתנת אוטומטית גם בסמסטר העוקב באותה שנה אקדמית. הזכאות לנק\"ז מילואים ולעובר בינארי נקבעת לפי הסמסטר המזכה או לפי הסמסטר המשויך לקבוצה הגבוהה יותר באותה שנה (אחד מהם).\nסטטוס לוחם/ייעוד קדמי יש לעדכן אחת לשנה.",
+      "humanFeedback": "שאלות נפוצות, מתווה תשפ\"ז #2\nhttps://www.bgu.ac.il/u/academic-affairs/dekanat/mitve2027/",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.322Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.322Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 23,
+      "question": "האם אצטרך לשלם על מבחן שלא הגעתי אליו עקב מילואים?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nמשרתי ומשרתות מילואים לא יחויבו בקנסות על אי הגעה לבחינה או על רישום מאוחר.",
+      "humanFeedback": "שאלות נפוצות, מתווה תשפ\"ז #3\nhttps://www.bgu.ac.il/u/academic-affairs/dekanat/mitve2027/",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.323Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.323Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 24,
+      "question": "מה ההשלכות הכלכליות של פריסת תואר בגין שירות מילואים?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nלפי הזכאות שנקבעה עבור הקבוצה, לא יחויבו קנסות בגין אי סיום התואר בשנים התקניות או על מערכת חלקית. ישולם שכר הלימוד הנורמטיבי בלבד, ותשלום על קורסים חוזרים יחול רק במקרים שאינם זכאים להם לפי המתווה ונוהל משרתי מילואים.",
+      "humanFeedback": "שאלות נפוצות, מתווה תשפ\"ז #4\nhttps://www.bgu.ac.il/u/academic-affairs/dekanat/mitve2027/",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.324Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.324Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 25,
+      "question": "עד מתי ניתן לבחור עובר בינארי/נק\"ז מילואים מהמתווה?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nניתן להגיש בקשה עד סיום התואר.",
+      "humanFeedback": "שאלות נפוצות, מתווה תשפ\"ז #5\nhttps://www.bgu.ac.il/u/academic-affairs/dekanat/mitve2027/",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.325Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.325Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 26,
+      "question": "מתי ניתן להיעזר בנציגים המחלקתיים?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nבמענה על פניות אישיות פרטניות, מימוש זכויות או התאמות במחלקה, מענה לאתגר נקודתי, עזרה בתקשורת עם מרצה, שאלות בנושא עובר בינארי או נק\"ז מילואים וכדומה.",
+      "humanFeedback": "שאלות נפוצות, מתווה תשפ\"ז #6\nhttps://www.bgu.ac.il/u/academic-affairs/dekanat/mitve2027/",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.326Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.326Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 27,
+      "question": "למי אפשר לפנות כדי לבטל קורסים?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nלמזכירות המחלקה, בהתאם למועדים שנקבעו.",
+      "humanFeedback": "שאלות נפוצות, מתווה תשפ\"ז #7\nhttps://www.bgu.ac.il/u/academic-affairs/dekanat/mitve2027/",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.327Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.327Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 28,
+      "question": "כיצד משרתי ומשרתות מילואים מדווחים על סטטוס לוחם/ייעוד קדמי?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nהפקת אישור סטודנט על אופי שירות המילואים: נכנסים לאזור האישי באתר המילואים (https://pa.miluim.idf.il/Login), בוחרים בתפריט \"אישור מזכה\" ומפיקים את האישור לשנה הרלוונטית.\nעל משרת או משרתת המילואים להיות מעודכנים כסטודנטים באתר המילואים. אם הסטטוס לא מעודכן, ניתן לעדכן אותו באופן עצמאי: https://www.miluim.idf.il/articles-list/%D7%A2%D7%93%D7%9B%D7%95%D7%9F-%D7%A4%D7%A8%D7%98%D7%99%D7%9D-%D7%90%D7%99%D7%A9%D7%99%D7%99%D7%9D/\nלאחר הפקת האישור מדווחים על סטטוס לוחם/ייעוד קדמי במערכת חרבות ברזל: https://bgu4u22.bgu.ac.il/apex/f?p=2004:101",
+      "humanFeedback": "שאלות נפוצות, מתווה תשפ\"ז #8\nhttps://www.bgu.ac.il/u/academic-affairs/dekanat/mitve2027/",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.328Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.328Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 29,
+      "question": "מהן ההתאמות ללומדים במסגרת הכשרה מעשית, בעיקר במקצועות הרפואיים?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nהתאמות והשלמות לסטודנטיות ולסטודנטים בהכשרה מעשית במקצועות הרפואה ייקבעו על ידי פורום דיקני רפואה, בתיאום עם הנהלות המוסדות האקדמיים.",
+      "humanFeedback": "שאלות נפוצות, מתווה תשפ\"ז #9\nhttps://www.bgu.ac.il/u/academic-affairs/dekanat/mitve2027/",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.329Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.329Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    },
+    {
+      "index": 30,
+      "question": "מה מתווה המילואים של המחלקה לאנגלית כשפה זרה?",
+      "expected": "תשובת הלקוח (מקור אמת לתוכן, לא נוסח מחייב):\nמתווה המילואים של המחלקה לאנגלית כשפה זרה מפורסם במסמך המחלקה: https://www.bgu.ac.il/media/gzwhd1nz/%D7%9E%D7%AA%D7%95%D7%95%D7%94-%D7%9C%D7%90%D7%A0%D7%92%D7%9C%D7%99%D7%AA-%D7%A1%D7%95%D7%A4%D7%99.pdf",
+      "humanFeedback": "שאלות נפוצות, מתווה תשפ\"ז #10\nhttps://www.bgu.ac.il/u/academic-affairs/dekanat/mitve2027/",
+      "finalAgentAnswer": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.329Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c",
+      "transcript": "",
+      "turns": 0,
+      "verdict": "ERROR",
+      "explanation": "ERROR: HTTP 403: {\"statusCode\":403,\"timestamp\":\"2026-10-25T12:04:29.329Z\",\"path\":\"/api/v1/agent/session\",\"method\":\"POST\",\"message\":\"Invalid client ID\",\"stack\":\"ForbiddenException: Invalid client ID\\n    at AuthGuard.c"
+    }
+  ]
+}

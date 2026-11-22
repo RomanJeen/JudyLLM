@@ -1,0 +1,2147 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Judy — LLM as a judge</title>
+  <script>
+    try { document.documentElement.dataset.theme = localStorage.getItem("judy-theme") || "light"; } catch (e) {}
+  </script>
+  <link rel="icon" href="/judy-mark.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/judy-mark.svg" />
+  <link rel="stylesheet" href="/judy-theme.css" />
+  <style>
+    /* ---------- layout ---------- */
+
+    .console {
+      display: grid;
+      grid-template-columns: 410px minmax(0, 1fr);
+      gap: 1.75rem;
+      padding: 1.5rem 1.5rem 4rem;
+      max-width: 1680px;
+      margin: 0 auto;
+      align-items: start;
+    }
+
+    .rail {
+      position: sticky;
+      top: 76px;
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 92px);
+      min-height: 0;
+    }
+
+    .main { display: grid; gap: 1.5rem; min-width: 0; }
+
+    /* ---------- config rail ---------- */
+
+    #evalForm { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+    .rail-scroll {
+      display: grid;
+      gap: 1rem;
+      align-content: start;
+      overflow: auto;
+      min-height: 0;
+      padding: 2px 6px 6px 2px;
+      margin: -2px -6px -6px -2px;
+    }
+
+    .field .panel-body { display: grid; gap: 1.1rem; }
+    .panel-head h2 { font: inherit; }
+    .fld { display: grid; gap: 0.4rem; min-width: 0; }
+    .lbl { font-size: 0.87rem; font-weight: 500; color: var(--text-soft); }
+    .lbl-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-height: 32px; }
+    .lbl-row .btn { margin-inline-end: -0.4rem; }
+    .field .hint { color: var(--muted); font-size: 0.8rem; }
+
+    #systemPrompt {
+      min-height: 12rem;
+      font-family: var(--f-mono);
+      font-size: 0.82rem;
+      line-height: 1.55;
+    }
+
+    .save-box {
+      display: grid;
+      gap: 0.6rem;
+      padding: 0.7rem 0.8rem;
+      border: 1px solid var(--accent);
+      background: var(--accent-dim);
+      border-radius: var(--r);
+    }
+    .save-box-main { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; }
+    .save-box-copy { font-size: 0.87rem; font-weight: 600; color: var(--accent); }
+    .save-box-actions { display: flex; gap: 0.4rem; }
+    .save-as-row { display: flex; gap: 0.5rem; }
+    .save-as-row input { flex: 1; min-width: 0; }
+
+    /* ---------- agent + environment picker ---------- */
+
+    .agent-picker { display: grid; gap: 1rem; }
+    .seg-field { display: grid; gap: 0.4rem; }
+    .agent-picker .seg { display: grid; }
+
+    .target-card {
+      display: grid;
+      gap: 0.35rem;
+      padding: 0.75rem 0.85rem;
+      border: 1px solid var(--hair);
+      border-radius: var(--r);
+      background: var(--panel-2);
+      font-size: 0.87rem;
+    }
+    .target-card .row { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+    .target-card .k { flex: none; width: 4.6rem; font-size: 0.8rem; color: var(--muted); }
+    .target-card .v { min-width: 0; color: var(--text); word-break: break-all; font-family: var(--f-mono); font-size: 0.8rem; }
+    .target-card .v.dim { color: var(--text-soft); }
+    .target-card .status { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; font-weight: 500; color: var(--text-soft); flex: none; }
+    .target-card .status .led { margin: 0; }
+
+    .custom-fields { display: grid; gap: 0.5rem; }
+
+    /* ---------- advanced ---------- */
+
+    .advanced summary {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      min-height: 52px;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      list-style: none;
+      font-family: var(--f-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      border-radius: var(--r-lg);
+    }
+    .advanced summary::-webkit-details-marker { display: none; }
+    .advanced summary:hover { background: var(--panel-2); }
+    .advanced summary:focus-visible { outline: none; box-shadow: var(--accent-glow); }
+    .advanced summary .aside { margin-inline-start: auto; font-family: var(--f-ui); font-weight: 400; font-size: 0.87rem; color: var(--muted); }
+    .advanced summary .icon { transition: transform 150ms ease; color: var(--muted); }
+    .advanced[open] summary .icon { transform: rotate(180deg); }
+    .advanced[open] summary { border-bottom: 1px solid var(--hair); border-radius: var(--r-lg) var(--r-lg) 0 0; }
+    .advanced .panel-body { display: grid; gap: 0.75rem; }
+    .num-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+    .num-grid label { display: grid; gap: 0.4rem; }
+
+    .rail-footer {
+      display: flex;
+      gap: 0.6rem;
+      margin-top: 1rem;
+      padding: 0.75rem;
+      border: 1px solid var(--hair);
+      border-radius: var(--r-lg);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .rail-footer .btn-lg { flex: 1; }
+    #stopBtn:disabled { display: none; }
+
+    .rail-summary { display: none; }
+    .rail.collapsed #evalForm { display: none; }
+    .rail.collapsed .rail-summary { display: block; }
+    .rail-summary .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem 1rem; }
+    .rail-summary .actions { display: flex; gap: 0.6rem; margin-top: 1.1rem; }
+    .rail-summary .actions .btn { flex: 1; }
+
+    /* ---------- run frame ---------- */
+
+    .runframe .panel-body { display: grid; gap: 1rem; }
+    .run-readouts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+      gap: 1rem 1.5rem;
+    }
+    .fatal {
+      border: 1px solid var(--false);
+      background: var(--false-dim);
+      color: var(--false);
+      padding: 0.75rem 1rem;
+      border-radius: var(--r);
+      font-size: 0.93rem;
+      display: grid;
+      gap: 0.25rem;
+    }
+    .fatal strong { font-weight: 600; }
+    .notes summary { cursor: pointer; font-size: 0.87rem; font-weight: 500; color: var(--text-soft); min-height: 28px; }
+    .notes ul { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.3rem; max-height: 10rem; overflow: auto; }
+    .notes li { font-size: 0.87rem; color: var(--text-soft); word-break: break-word; }
+    .notes li.warn { color: var(--error); }
+
+    .idle-hero {
+      padding: 3rem 1.5rem;
+      text-align: center;
+      display: grid;
+      gap: 0.75rem;
+      justify-items: center;
+    }
+    .idle-hero .badge {
+      display: grid;
+      place-items: center;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: var(--accent-dim);
+      color: var(--accent);
+      font-size: 1.9rem;
+    }
+    .idle-hero .big { font-family: var(--f-display); font-size: 1.75rem; font-weight: 700; color: var(--text); line-height: 1.2; }
+    .idle-hero p { margin: 0; color: var(--text-soft); max-width: 34rem; }
+
+    /* ---------- progress strip ---------- */
+
+    .strip {
+      position: sticky;
+      top: 72px;
+      z-index: 10;
+      background: color-mix(in srgb, var(--panel) 94%, transparent);
+      backdrop-filter: blur(10px);
+    }
+    .strip-top {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 1.25rem;
+      align-items: center;
+      padding: 1rem 1rem 0.75rem;
+    }
+    .strip-progress { display: grid; gap: 0.2rem; }
+    .strip-progress .of { font-size: 0.8rem; color: var(--muted); }
+    .strip-counts { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; font-size: 0.87rem; }
+    .strip-counts .c {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.2rem 0.7rem;
+      border: 1px solid var(--hair);
+      border-radius: 999px;
+      background: var(--panel-2);
+      font-variant-numeric: tabular-nums;
+      color: var(--text-soft);
+    }
+    .strip-counts .c b { font-weight: 600; color: var(--text); }
+    .strip-counts .eta { border-style: dashed; }
+    .strip-counts .eta b { color: var(--accent); }
+    .spark { width: 160px; height: 44px; display: grid; gap: 0.1rem; justify-items: end; }
+    .spark canvas { width: 160px !important; height: 30px !important; }
+    .spark .k { font-size: 0.73rem; color: var(--muted); }
+
+    .cells {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 0 1rem 0.9rem;
+      max-height: 6.4rem;
+      overflow: auto;
+    }
+    .cell {
+      width: 16px;
+      height: 16px;
+      padding: 0;
+      border: 1px solid var(--hair-strong);
+      border-radius: 4px;
+      background: var(--bg-2);
+      cursor: pointer;
+    }
+    .cell.s-agent,
+    .cell.s-judging { background: var(--accent); border-color: var(--accent); animation: judy-pulse 1.4s ease-in-out infinite; }
+    .cell.v-ok { background: var(--ok); border-color: var(--ok); }
+    .cell.v-partial { background: var(--partial); border-color: var(--partial); }
+    .cell.v-false { background: var(--false); border-color: var(--false); }
+    .cell.v-error { background: var(--error); border-color: var(--error); }
+    .cell.s-skipped { background: repeating-linear-gradient(45deg, var(--hair-strong) 0 2px, transparent 2px 4px); }
+    .cell:hover { outline: 2px solid var(--text); outline-offset: 1px; }
+    .cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+    .strip-tools {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 1rem;
+      padding: 0.6rem 1rem;
+      border-top: 1px solid var(--hair);
+    }
+    .strip-tools .spacer { flex: 1; }
+
+    /* ---------- question frames ---------- */
+
+    .frames { display: grid; gap: 0.75rem; }
+    .frames.problems-only .qframe.v-ok,
+    .frames.problems-only .qframe.v-partial,
+    .frames.problems-only .qframe.s-skipped { display: none; }
+
+    .qframe { overflow: hidden; transition: box-shadow 200ms ease; }
+    .qframe.open { box-shadow: var(--shadow); }
+
+    .qhead {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem 0.75rem;
+      padding: 0.8rem 0.75rem 0.8rem 1rem;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .qhead:hover { background: var(--panel-2); }
+    .qhead:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
+    .qframe.v-false .qhead { background: linear-gradient(90deg, var(--false-dim), transparent 70%); }
+    .qframe.v-error .qhead { background: linear-gradient(90deg, var(--error-dim), transparent 70%); }
+    .qframe.v-partial .qhead { background: linear-gradient(90deg, var(--partial-dim), transparent 70%); }
+    .qnum {
+      font-family: var(--f-display);
+      font-weight: 700;
+      font-size: 1.35rem;
+      min-width: 3rem;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .qmeta { color: var(--muted); font-size: 0.87rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .qminis { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; }
+    .qretry { font-size: 0.8rem; color: var(--error); font-weight: 500; white-space: nowrap; }
+    .qspacer { flex: 1; }
+    .chev {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      flex: none;
+      border-radius: 50%;
+      transition: background 120ms ease;
+    }
+    .qhead:hover .chev { background: var(--raised); }
+    .chev::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 9px;
+      height: 9px;
+      margin: -7px 0 0 -5px;
+      border-right: 2px solid var(--text-soft);
+      border-bottom: 2px solid var(--text-soft);
+      transform: rotate(45deg);
+      transition: transform 150ms ease;
+    }
+    .qframe.open .chev::before { transform: rotate(-135deg); margin-top: -3px; }
+
+    .qtext {
+      padding: 0 1rem 0.9rem;
+      font-family: var(--f-read);
+      font-size: 1.03rem;
+      line-height: 1.65;
+      color: var(--text);
+    }
+    .qtext .clamp {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .qframe:not(.open) .qtext .clamp { -webkit-line-clamp: 1; }
+    .qtext.full .clamp { -webkit-line-clamp: unset; display: block; }
+    .qtext .more {
+      font: inherit;
+      font-size: 0.87rem;
+      font-weight: 500;
+      background: none;
+      border: 0;
+      border-radius: var(--r-sm);
+      padding: 0.2rem 0.4rem;
+      margin: 0.2rem 0 0 -0.4rem;
+      min-height: 28px;
+      color: var(--accent);
+      cursor: pointer;
+    }
+    .qtext .more:hover { background: var(--accent-dim); }
+
+    .qbody { display: none; border-top: 1px solid var(--hair); }
+    .qframe.open .qbody { display: block; }
+
+    .qfindings { border-top: 1px solid var(--hair); }
+
+    .log-well {
+      font-family: var(--f-mono);
+      font-size: 0.82rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      padding: 1rem;
+      min-height: 18rem;
+      max-height: 70vh;
+      overflow: auto;
+      background: var(--bg-2);
+      border-radius: 0 0 var(--r-lg) var(--r-lg);
+    }
+    .log-line { margin: 0; }
+    .log-line.ok { color: var(--ok); }
+    .log-line.partial { color: var(--partial); }
+    .log-line.false { color: var(--false); }
+    .log-line.error { color: var(--error); }
+    .log-line.stderr { color: var(--muted); }
+
+    /* ---------- current run container ---------- */
+
+    .current-run { display: grid; gap: 1rem; min-width: 0; }
+    .current-run-head {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: var(--f-display);
+      font-size: 1.6rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .current-run-sub { margin-inline-start: auto; font-family: var(--f-ui); font-weight: 400; font-size: 0.93rem; color: var(--muted); }
+
+    .answers-min-bar { display: none; }
+    .current-run.answers-min #frames,
+    .current-run.answers-min #rawPanel { display: none; }
+    .current-run.answers-min .answers-min-bar:not(.hidden) {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      width: 100%;
+      min-height: 52px;
+      padding: 0.6rem 1rem;
+      border: 1px dashed var(--hair-strong);
+      border-radius: var(--r-lg);
+      background: var(--panel);
+      color: var(--text-soft);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .answers-min-bar:hover { border-color: var(--accent); color: var(--text); }
+    .answers-min-cta { margin-inline-start: auto; color: var(--accent); font-weight: 600; font-size: 0.93rem; }
+
+    .section-divider {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin: 1.75rem 0 1.25rem;
+      color: var(--muted);
+      font-family: var(--f-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+    .section-divider::before,
+    .section-divider::after { content: ""; flex: 1; height: 1px; background: var(--hair-strong); }
+
+    /* ---------- this run + history ---------- */
+
+    .this-run .panel-body { display: grid; gap: 1rem; }
+    .summary { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem 2rem; }
+    .summary-counts { font-size: 0.93rem; color: var(--text-soft); }
+    .summary-counts .ok { color: var(--ok); font-weight: 500; }
+    .summary-counts .partial { color: var(--partial); font-weight: 500; }
+    .summary-counts .false { color: var(--false); font-weight: 500; }
+    .summary-counts .error { color: var(--error); font-weight: 500; }
+    .run-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+
+
+    @media (max-width: 1100px) {
+      .console { grid-template-columns: 1fr; }
+      .rail { position: static; max-height: none; }
+      .rail-scroll { overflow: visible; }
+      .rail-footer { position: sticky; bottom: 0.75rem; z-index: 12; }
+      .strip { top: 68px; }
+    }
+
+    @media (max-width: 760px) {
+      .console { padding: 1rem 1rem 4rem; }
+    }
+
+    @media (max-width: 640px) {
+      .strip-top { grid-template-columns: 1fr; }
+      .spark { display: none; }
+      .num-grid { grid-template-columns: 1fr 1fr; }
+      .brand-sub { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <img class="brand-mark" src="/judy-mark.svg" width="32" height="32" alt="" aria-hidden="true" />
+      <span>
+        <span class="brand-word">Judy</span>
+        <span class="brand-sub">LLM as a judge</span>
+      </span>
+    </a>
+    <span class="topbar-spacer"></span>
+    <a class="btn btn-sm" href="/reports" id="reportsLink"><span data-icon="file"></span>Reports</a>
+    <span class="sys" role="status"><span class="led" id="statusLed"></span><span id="status">Idle</span></span>
+    <button type="button" class="btn btn-sm theme-toggle" id="themeToggle"></button>
+  </header>
+
+  <div class="console">
+    <aside class="rail" id="rail">
+      <section class="panel rail-summary" id="railSummary">
+        <div class="panel-head"><span class="led live" id="railSummaryLed"></span>Run configuration<span class="aside">locked while running</span></div>
+        <div class="panel-body">
+          <div class="grid" id="railSummaryGrid"></div>
+          <div class="actions">
+            <button type="button" class="btn" id="editConfigBtn"><span data-icon="edit"></span>Edit config</button>
+            <button type="button" class="btn btn-danger" id="stopBtnSummary"><span data-icon="stop"></span>Stop</button>
+          </div>
+        </div>
+      </section>
+
+      <form id="evalForm">
+        <div class="rail-scroll">
+          <section class="panel field" aria-labelledby="secJudge">
+            <div class="panel-head"><h2 id="secJudge">What to judge</h2></div>
+            <div class="panel-body">
+              <div class="fld">
+                <label class="lbl" for="promptScenario">Judge scenario</label>
+                <select id="promptScenario"></select>
+              </div>
+              <div class="fld">
+                <button type="button" class="toggle" id="feedbackToggle" aria-pressed="false"><span class="track"></span>Send human feedback to judge</button>
+                <div class="hint" id="feedbackHint">Off: the judge only sees the question, the old reference answer (as a topic hint) and the conversation.</div>
+              </div>
+              <div class="fld">
+                <div class="lbl-row">
+                  <label class="lbl" for="systemPrompt">System prompt</label>
+                  <button type="button" class="btn btn-ghost btn-sm" id="resetPrompt" title="Replace the text with the default prompt"><span data-icon="refresh"></span>Reset to default</button>
+                </div>
+                <textarea id="systemPrompt" spellcheck="false" autocomplete="off" wrap="soft"></textarea>
+                <div class="hint" id="promptHint">Pick a scenario from prompts/, edit to test a fix, then save it back to that file.</div>
+                <div id="promptSaveBox" class="save-box hidden" role="status">
+                  <div class="save-box-main">
+                    <span class="save-box-copy">Unsaved changes</span>
+                    <div class="save-box-actions">
+                      <button type="button" class="btn btn-ghost btn-sm" id="discardPrompt">Discard</button>
+                      <button type="button" class="btn btn-sm" id="saveAsPrompt">Save as new</button>
+                      <button type="button" class="btn btn-primary btn-sm" id="savePrompt"><span data-icon="save"></span>Save</button>
+                    </div>
+                  </div>
+                  <div id="saveAsRow" class="save-as-row hidden">
+                    <input id="saveAsName" type="text" placeholder="New scenario name, e.g. rag-strict" aria-label="New scenario name" autocomplete="off" spellcheck="false" />
+                    <button type="button" class="btn btn-primary btn-sm" id="confirmSaveAs">Create</button>
+                  </div>
+                </div>
+              </div>
+              <div class="fld">
+                <label class="lbl" for="inputFile">Input file</label>
+                <select id="inputFile" required></select>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel field" aria-labelledby="secWhere">
+            <div class="panel-head"><h2 id="secWhere">Where to run</h2><button type="button" class="btn btn-ghost btn-sm aside" id="refreshBackends" title="Check which backends are reachable"><span data-icon="activity"></span>Check backends</button></div>
+            <div class="panel-body">
+              <div class="agent-picker" id="agentPicker">
+                <div class="seg-field"><span class="lbl">Agent</span><div class="seg" id="agentSeg" role="radiogroup" aria-label="Agent"></div></div>
+                <div class="seg-field" id="envField"><span class="lbl">Environment</span><div class="seg env" id="envSeg" role="radiogroup" aria-label="Environment"></div></div>
+                <div class="target-card" id="targetCard"></div>
+                <div class="custom-fields hidden" id="customFields">
+                  <input id="customUrl" type="url" placeholder="Backend URL, e.g. http://localhost:4000" aria-label="Backend URL" autocomplete="off" spellcheck="false" />
+                  <input id="customClientId" type="text" placeholder="x-pola-client-id" aria-label="Client ID" autocomplete="off" spellcheck="false" />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <details class="panel field advanced" id="advanced">
+            <summary><span>Advanced</span><span class="aside" id="advSummary">Rows, parallel runs, turns</span><span data-icon="chevron-down"></span></summary>
+            <div class="panel-body">
+              <div class="num-grid">
+                <label><span class="lbl">Rows to run</span><input id="limit" type="number" min="0" step="1" placeholder="all" /></label>
+                <label><span class="lbl">Parallel</span><input id="concurrency" type="number" min="1" max="32" step="1" /></label>
+                <label><span class="lbl">Max turns</span><input id="maxTurns" type="number" min="1" max="32" step="1" /></label>
+              </div>
+              <div class="hint">Leave rows empty to run every row. The advice-flow scenario uses 2 parallel and 12 turns.</div>
+            </div>
+          </details>
+        </div>
+
+        <div class="rail-footer">
+          <button type="submit" class="btn btn-primary btn-lg" id="startBtn"><span data-icon="play"></span>Start run</button>
+          <button type="button" class="btn btn-danger btn-lg" id="stopBtn" disabled><span data-icon="stop"></span>Stop</button>
+        </div>
+      </form>
+    </aside>
+
+    <main class="main">
+      <div class="current-run" id="currentRun">
+      <h2 class="current-run-head">
+        Current run
+        <span class="current-run-sub" id="currentRunSub"></span>
+        <a class="btn btn-sm" id="watchLiveLink" href="/live" target="_blank" rel="noopener" title="Watch the judges work in an isometric office"><span data-icon="eye"></span>Watch live</a>
+      </h2>
+      <section class="panel runframe" id="runFrame">
+        <div class="panel-head">
+          <span class="led" id="runLed"></span>Run
+          <span class="pill wait" id="runPill">Idle</span>
+          <span class="aside" id="runElapsed"></span>
+        </div>
+        <div class="panel-body">
+          <div class="idle-hero" id="idleHero">
+            <span class="badge"><span data-icon="inbox"></span></span>
+            <div class="big">Ready when you are</div>
+            <p>Choose a judge scenario and an input file on the left, then press <strong>Start run</strong>. Every question shows up here as it is judged.</p>
+          </div>
+          <div class="run-readouts hidden" id="runReadouts"></div>
+          <div class="fatal hidden" id="fatalBox"></div>
+          <details class="notes hidden" id="notesBox">
+            <summary id="notesSummary">Notes</summary>
+            <ul id="notesList"></ul>
+          </details>
+        </div>
+      </section>
+
+      <section class="panel strip hidden" id="strip">
+        <div class="strip-top">
+          <div class="strip-progress">
+            <div class="readout accent sm" id="progressReadout">0<span class="unit">/ 0</span></div>
+            <div class="of">questions done</div>
+          </div>
+          <div class="strip-counts" id="stripCounts"></div>
+          <div class="spark" id="sparkWrap">
+            <canvas id="sparkCanvas" width="160" height="30" aria-label="Questions finished per minute"></canvas>
+            <span class="k">done per minute</span>
+          </div>
+        </div>
+        <div class="cells" id="cells" role="list" aria-label="Question status"></div>
+        <div class="strip-tools">
+          <div class="seg" role="group" aria-label="Which answers to show">
+            <button type="button" id="segAll" class="active" aria-pressed="true">All</button>
+            <button type="button" id="segProblems" aria-pressed="false">Problems only</button>
+          </div>
+          <button type="button" class="toggle" id="followToggle" aria-pressed="true"><span class="track"></span>Follow live</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn btn-sm" id="viewMenuBtn"><span data-icon="more"></span>More</button>
+        </div>
+        <!-- State holders driven by the toolbar above and the "More" menu. -->
+        <div hidden class="legacy-controls">
+          <button type="button" id="problemsToggle" aria-pressed="false"></button>
+          <button type="button" id="rawToggle" aria-pressed="false"></button>
+          <button type="button" id="expandAllBtn"></button>
+          <button type="button" id="collapseAllBtn"></button>
+          <button type="button" id="minimizeBtn" aria-expanded="true" aria-controls="frames">Minimize answers</button>
+        </div>
+      </section>
+
+      <div class="frames" id="frames" aria-live="polite"></div>
+
+      <section class="panel hidden" id="rawPanel">
+        <div class="panel-head"><span class="led accent"></span>Raw log<span class="aside">stdout and stderr</span></div>
+        <div class="log-well" id="logWell"></div>
+      </section>
+
+      <button type="button" class="answers-min-bar" id="answersMinBar">
+        <span id="answersMinText">Answers hidden</span><span class="answers-min-cta">Show answers</span>
+      </button>
+
+      <section class="panel this-run hidden" id="downloadRow">
+        <div class="panel-head"><span class="led accent"></span>This run<span class="aside" id="thisRunName"></span></div>
+        <div class="panel-body">
+          <div id="summaryBlock" class="summary hidden">
+            <div class="readout accent" id="summaryRate"></div>
+            <div class="readout sm" id="summaryScore"></div>
+            <div class="summary-counts" id="summaryCounts"></div>
+          </div>
+          <div class="run-actions">
+            <a class="btn btn-primary" id="viewLink" href="#"><span data-icon="file"></span>View report</a>
+            <span id="downloadSlot"></span>
+            <button type="button" class="btn btn-icon" id="thisRunMore" aria-label="More actions for this run" title="More actions"><span data-icon="more"></span></button>
+          </div>
+          <div hidden class="legacy-controls">
+            <button type="button" id="copyPathBtn"></button>
+            <button type="button" id="deleteCurrentBtn"></button>
+          </div>
+          <div id="currentRunTags" class="run-tags hidden"></div>
+        </div>
+      </section>
+
+      </div>
+
+    </main>
+  </div>
+
+  <script src="/vendor/gsap.min.js"></script>
+  <script src="/vendor/chart.umd.min.js"></script>
+  <script src="/judy-ui.js"></script>
+  <script>
+    const J = window.Judy;
+    const $ = (id) => document.getElementById(id);
+
+    for (const el of document.querySelectorAll("[data-icon]")) el.outerHTML = J.icon(el.dataset.icon);
+
+    const statusEl = $("status");
+    const statusLed = $("statusLed");
+    const systemPromptEl = $("systemPrompt");
+    const promptScenarioEl = $("promptScenario");
+    const resetPromptBtn = $("resetPrompt");
+    const promptHintEl = $("promptHint");
+    const promptSaveBox = $("promptSaveBox");
+    const savePromptBtn = $("savePrompt");
+    const saveAsPromptBtn = $("saveAsPrompt");
+    const confirmSaveAsBtn = $("confirmSaveAs");
+    const saveAsRow = $("saveAsRow");
+    const saveAsNameEl = $("saveAsName");
+    const discardPromptBtn = $("discardPrompt");
+    const inputFileEl = $("inputFile");
+    const agentPicker = $("agentPicker");
+    const agentSeg = $("agentSeg");
+    const envSeg = $("envSeg");
+    const envField = $("envField");
+    const targetCard = $("targetCard");
+    const customFields = $("customFields");
+    const refreshBackendsBtn = $("refreshBackends");
+    const limitEl = $("limit");
+    const concurrencyEl = $("concurrency");
+    const maxTurnsEl = $("maxTurns");
+    const feedbackToggleEl = $("feedbackToggle");
+    const feedbackHintEl = $("feedbackHint");
+    const formEl = $("evalForm");
+    const startBtn = $("startBtn");
+    const stopBtn = $("stopBtn");
+    const stopBtnSummary = $("stopBtnSummary");
+    const railEl = $("rail");
+    const railSummaryGrid = $("railSummaryGrid");
+    const railSummaryLed = $("railSummaryLed");
+    const editConfigBtn = $("editConfigBtn");
+    const logWell = $("logWell");
+    const rawPanel = $("rawPanel");
+    const downloadRow = $("downloadRow");
+    const thisRunName = $("thisRunName");
+    const viewLink = $("viewLink");
+    const downloadControl = J.downloadControl("");
+    $("downloadSlot").replaceWith(downloadControl);
+    const copyPathBtn = $("copyPathBtn");
+    const currentRunTags = $("currentRunTags");
+    const summaryBlock = $("summaryBlock");
+    const summaryRate = $("summaryRate");
+    const summaryScore = $("summaryScore");
+    const summaryCounts = $("summaryCounts");
+
+    const runLed = $("runLed");
+    const runPill = $("runPill");
+    const runElapsed = $("runElapsed");
+    const idleHero = $("idleHero");
+    const runReadouts = $("runReadouts");
+    const fatalBox = $("fatalBox");
+    const notesBox = $("notesBox");
+    const notesSummary = $("notesSummary");
+    const notesList = $("notesList");
+    const stripEl = $("strip");
+    const progressReadout = $("progressReadout");
+    const stripCounts = $("stripCounts");
+    const sparkWrap = $("sparkWrap");
+    const sparkCanvas = $("sparkCanvas");
+    const cellsEl = $("cells");
+    const framesEl = $("frames");
+    const problemsToggle = $("problemsToggle");
+    const followToggle = $("followToggle");
+    const rawToggle = $("rawToggle");
+    const expandAllBtn = $("expandAllBtn");
+    const collapseAllBtn = $("collapseAllBtn");
+    const currentRunEl = $("currentRun");
+    const currentRunSub = $("currentRunSub");
+    const minimizeBtn = $("minimizeBtn");
+    const answersMinBar = $("answersMinBar");
+    const answersMinText = $("answersMinText");
+    let answersMinimized = false;
+
+    const CLIENT_STORAGE_KEY = "judy.clientPreset";
+    const CUSTOM_CLIENT_STORAGE_KEY = "judy.customClientId";
+    const SCENARIO_STORAGE_KEY = "judy.promptScenario";
+    const CONCURRENCY_STORAGE_KEY = "judy.concurrency";
+    const MAX_TURNS_STORAGE_KEY = "judy.maxTurns";
+    const INCLUDE_FEEDBACK_STORAGE_KEY = "judy.includeFeedback";
+
+    function includeFeedbackOn() {
+      return feedbackToggleEl.getAttribute("aria-pressed") === "true";
+    }
+
+    function setIncludeFeedback(on) {
+      feedbackToggleEl.setAttribute("aria-pressed", on ? "true" : "false");
+      feedbackHintEl.textContent = on
+        ? "On: the judge also sees the human feedback note for each question."
+        : "Off: the judge only sees the question, the old reference answer (as a topic hint) and the conversation.";
+    }
+
+    function feedbackLabel() {
+      return includeFeedbackOn() ? "on" : "off";
+    }
+    const VIEW_STORAGE_KEY = "judy.liveView";
+
+    let defaultSystemPrompt = "";
+    let savedSystemPrompt = "";
+    let promptScenarios = [];
+    let activeScenario = "default";
+
+    let running = false;
+    let currentRunName = null;
+    let stickToBottom = true;
+    let selectedAgentId = "pola";
+    let clientPresets = [];
+    let backendsByTarget = {};
+    let eventSource = null;
+    let runStatus = "IDLE";
+
+    /* ---------- status + running state ---------- */
+
+    const STATUS_STYLE = {
+      IDLE: { led: "", pill: "wait", label: "Idle" },
+      RUNNING: { led: "live", pill: "accent", label: "Running" },
+      DONE: { led: "ok", pill: "ok", label: "Done" },
+      STOPPED: { led: "error", pill: "error", label: "Stopped" },
+      FAILED: { led: "false", pill: "false", label: "Failed" },
+    };
+
+    function setStatus(status) {
+      runStatus = status;
+      const style = STATUS_STYLE[status] || STATUS_STYLE.IDLE;
+      statusEl.textContent = style.label;
+      statusLed.className = `led ${style.led}`;
+      runLed.className = `led ${style.led}`;
+      runPill.className = `pill ${style.pill}`;
+      runPill.textContent = style.label;
+      railSummaryLed.className = `led ${style.led}`;
+    }
+
+    function setRunning(isRunning) {
+      running = isRunning;
+      for (const el of [
+        systemPromptEl, promptScenarioEl, resetPromptBtn, savePromptBtn, saveAsPromptBtn,
+        confirmSaveAsBtn, saveAsNameEl, discardPromptBtn, inputFileEl, limitEl,
+        concurrencyEl, maxTurnsEl, refreshBackendsBtn, feedbackToggleEl,
+      ]) {
+        el.disabled = isRunning;
+      }
+      startBtn.disabled = isRunning;
+      stopBtn.disabled = !isRunning;
+      stopBtnSummary.disabled = !isRunning;
+      editConfigBtn.disabled = isRunning;
+      editConfigBtn.title = isRunning ? "Available when the run finishes" : "";
+
+      for (const button of agentPicker.querySelectorAll("button")) button.disabled = isRunning;
+      for (const input of customFields.querySelectorAll("input")) input.disabled = isRunning;
+
+      if (isRunning) collapseRail();
+    }
+
+    function collapseRail() {
+      renderRailSummary();
+      railEl.classList.add("collapsed");
+    }
+
+    function expandRail() {
+      railEl.classList.remove("collapsed");
+      J.motion.reveal(formEl.children, { y: 8, stagger: 0.03, duration: 0.35 });
+    }
+
+    function renderRailSummary() {
+      const preset = clientPresets.find((item) => item.id === selectedAgentId);
+      const f = model.run.fields;
+      if (!launchedHere && f.input) {
+        const items = [
+          ["Prompt", f.prompt || "—"],
+          ["Input", f.input],
+          ["Target", f.target || "—"],
+          ["Backend", f.backend || "—"],
+          ["Rows", model.total ? `${model.total} of ${f.loaded ?? "?"}` : "—"],
+          ["Parallel / turns", `${f.concurrency ?? "—"} / ${f.maxTurns ?? "—"}`],
+          ["Human feedback", f.humanFeedback || "—"],
+        ];
+        railSummaryGrid.innerHTML = items
+          .map(([k, v]) => `<div class="kv"><span class="k">${J.escapeHtml(k)}</span><span class="v" title="${J.escapeHtml(v)}">${J.escapeHtml(v)}</span></div>`)
+          .join("");
+        return;
+      }
+      const items = [
+        ["Scenario", activeScenario || "default"],
+        ["Input", inputFileEl.value || "—"],
+        ["Agent", preset ? preset.label : ($("customUrl") || {}).value || "custom"],
+        ["Rows", limitEl.value.trim() || "all"],
+        ["Parallel / turns", `${concurrencyEl.value || "—"} / ${maxTurnsEl.value || "—"}`],
+        ["Human feedback", feedbackLabel()],
+      ];
+      railSummaryGrid.innerHTML = items
+        .map(([k, v]) => `<div class="kv"><span class="k">${J.escapeHtml(k)}</span><span class="v" title="${J.escapeHtml(v)}">${J.escapeHtml(v)}</span></div>`)
+        .join("");
+    }
+
+    /* ---------- summary (this run) ---------- */
+
+    function hideSummary() {
+      summaryBlock.classList.add("hidden");
+      summaryRate.textContent = "";
+      summaryScore.textContent = "";
+      summaryCounts.innerHTML = "";
+    }
+
+    function showSummary(summary) {
+      if (!summary) {
+        hideSummary();
+        return;
+      }
+      summaryBlock.classList.remove("hidden");
+      summaryRate.innerHTML = `<span class="num">0%</span><span class="unit">pass rate</span>`;
+      summaryScore.innerHTML = `<span class="num">0%</span><span class="unit">score</span>`;
+      J.motion.count(summaryRate.querySelector(".num"), Number(summary.passRate), { decimals: 1, suffix: "%" });
+      J.motion.count(summaryScore.querySelector(".num"), Number(summary.score ?? summary.passRate), { decimals: 1, suffix: "%" });
+      summaryCounts.innerHTML =
+        `${summary.total} rows · <span class="ok">${summary.ok} OK</span> · <span class="partial">${summary.partial ?? 0} PARTIAL</span> · ` +
+        `<span class="false">${summary.false} FALSE</span> · <span class="error">${summary.error} ERROR</span>`;
+    }
+
+    /* ---------- live model ---------- */
+
+    let model = J.createLogModel();
+    let launchedHere = false;
+    const frameEls = new Map();
+    const cellEls = [];
+    const openState = new Map();
+    const fullText = new Set();
+    let pendingQs = new Set();
+    let pendingRun = false;
+    let pendingStrip = false;
+    let rafId = 0;
+    let replaying = false;
+    let follow = true;
+    let sparkChart = null;
+    let lastFollowN = null;
+
+    function classifyLine(line) {
+      if (/\bFATAL\b/.test(line) || /\bERROR\b/.test(line)) return "error";
+      if (/judge\s*->\s*PARTIAL\b/.test(line)) return "partial";
+      if (/judge\s*->\s*FALSE\b/.test(line)) return "false";
+      if (/judge\s*->\s*OK\b/.test(line)) return "ok";
+      return "";
+    }
+
+    function appendRaw(line, stream) {
+      const p = document.createElement("p");
+      p.className = "log-line";
+      const tone = classifyLine(line);
+      if (tone) p.classList.add(tone);
+      if (stream === "stderr" && !tone) p.classList.add("stderr");
+      p.textContent = line;
+      logWell.appendChild(p);
+      if (stickToBottom) logWell.scrollTop = logWell.scrollHeight;
+    }
+
+    function uiNote(text) {
+      model.run.notes.push({ text, tone: "warn", at: Date.now() });
+      appendRaw(text, "stderr");
+      pendingRun = true;
+      schedule();
+    }
+
+    function ingestLine(line, stream, now) {
+      appendRaw(line, stream);
+      const result = model.ingest(line, stream, now);
+      if (result.q != null) {
+        pendingQs.add(result.q);
+        pendingStrip = true;
+      }
+      if (result.run) pendingRun = true;
+      if (model.run.summary) {
+        downloadRow.classList.remove("hidden");
+      }
+      schedule();
+    }
+
+    function schedule() {
+      if (rafId) return;
+      rafId = requestAnimationFrame(flush);
+    }
+
+    function flush() {
+      rafId = 0;
+      if (pendingRun) {
+        renderRunFrame();
+        pendingRun = false;
+        pendingStrip = true;
+      }
+      if (pendingStrip) {
+        renderStrip();
+        pendingStrip = false;
+      }
+      if (pendingQs.size) {
+        const changed = [...pendingQs].sort((a, b) => a - b);
+        pendingQs = new Set();
+        for (const n of changed) renderQuestion(model.questions.get(n));
+        if (follow && !replaying) followNewest();
+      }
+    }
+
+    function resetLive() {
+      model = J.createLogModel();
+      frameEls.clear();
+      openState.clear();
+      fullText.clear();
+      cellEls.length = 0;
+      framesEl.innerHTML = "";
+      cellsEl.innerHTML = "";
+      logWell.innerHTML = "";
+      stickToBottom = true;
+      pendingQs = new Set();
+      pendingRun = true;
+      pendingStrip = true;
+      lastFollowN = null;
+      if (sparkChart) {
+        sparkChart.data.labels = [];
+        sparkChart.data.datasets[0].data = [];
+        sparkChart.update("none");
+      }
+      schedule();
+    }
+
+    /* ---------- run frame ---------- */
+
+    function renderRunFrame() {
+      const run = model.run;
+      const f = run.fields;
+      const hasRun = Object.keys(f).length > 0 || model.total > 0 || run.notes.length || run.fatal.length;
+      idleHero.classList.toggle("hidden", Boolean(hasRun) || running);
+      runReadouts.classList.toggle("hidden", !hasRun && !running);
+      stripEl.classList.toggle("hidden", !(model.total > 0));
+
+      const readouts = [
+        ["Target", f.target],
+        ["Backend", f.backend],
+        ["Input", f.input ? `${f.input}${f.loaded ? ` · ${f.loaded} rows` : ""}` : ""],
+        ["Running", model.total ? J.plural(model.total, "question") : ""],
+        ["Parallel", f.concurrency],
+        ["Max turns", f.maxTurns],
+        ["Judge prompt", f.prompt ? `${f.prompt}${f.promptSha ? ` · ${f.promptSha}` : ""}` : ""],
+        ["Human feedback", f.humanFeedback],
+      ];
+      runReadouts.innerHTML = readouts
+        .map(([k, v]) => {
+          const value = v == null || v === "" ? "—" : String(v);
+          return `<div class="kv"><span class="k">${k}</span><span class="v" title="${J.escapeHtml(value)}">${J.escapeHtml(value)}</span></div>`;
+        })
+        .join("");
+
+      if (run.fatal.length) {
+        fatalBox.classList.remove("hidden");
+        fatalBox.innerHTML = `<strong>Fatal</strong>${run.fatal.map((line) => `<span>${J.escapeHtml(line)}</span>`).join("")}`;
+      } else {
+        fatalBox.classList.add("hidden");
+      }
+
+      if (run.notes.length) {
+        notesBox.classList.remove("hidden");
+        const warns = run.notes.filter((note) => note.tone === "warn").length;
+        notesSummary.textContent = `Notes · ${run.notes.length}${warns ? ` · ${warns} warnings` : ""}`;
+        notesList.innerHTML = run.notes
+          .map((note) => `<li class="${note.tone}">${J.escapeHtml(note.text)}</li>`)
+          .join("");
+      } else {
+        notesBox.classList.add("hidden");
+      }
+
+      ensureCells();
+    }
+
+    /* ---------- progress strip ---------- */
+
+    function ensureCells() {
+      while (cellEls.length < model.total) {
+        const n = cellEls.length + 1;
+        const cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = "cell s-waiting";
+        cell.setAttribute("role", "listitem");
+        cell.title = `#${n} · waiting`;
+        cell.addEventListener("click", () => jumpTo(n));
+        cellsEl.appendChild(cell);
+        cellEls.push(cell);
+      }
+    }
+
+    function questionStatusLabel(q) {
+      if (!q || q.status === "waiting") return "waiting";
+      if (q.status === "done" || q.status === "error") return q.verdict;
+      if (q.status === "skipped") return "skipped";
+      if (q.status === "judging") return `judging · turn ${q.turn}${q.maxTurns ? `/${q.maxTurns}` : ""}`;
+      const next = q.turn + 1;
+      return `agent · turn ${next}${q.maxTurns ? `/${q.maxTurns}` : ""}`;
+    }
+
+    function cellClass(q) {
+      if (!q) return "cell s-waiting";
+      const parts = ["cell", `s-${q.status}`];
+      if (q.status === "done" || q.status === "error") parts.push(`v-${J.verdictClass(q.verdict)}`);
+      return parts.join(" ");
+    }
+
+    function renderStrip() {
+      ensureCells();
+      for (let n = 1; n <= model.total; n += 1) {
+        const q = model.questions.get(n);
+        const cell = cellEls[n - 1];
+        const next = cellClass(q);
+        if (cell.className !== next) {
+          const wasDone = /\bv-/.test(cell.className);
+          cell.className = next;
+          cell.title = `#${n} · ${questionStatusLabel(q)}`;
+          if (!wasDone && /\bv-/.test(next) && !replaying) J.motion.fillCell(cell);
+        }
+      }
+
+      const t = model.tally();
+      progressReadout.innerHTML = `${t.done}<span class="unit">/ ${model.total}</span>`;
+      const eta = estimateEta(t);
+      stripCounts.innerHTML = [
+        ["ok", "OK", t.OK],
+        ["partial", "Partial", t.PARTIAL],
+        ["false", "False", t.FALSE],
+        ["error", "Error", t.ERROR],
+      ]
+        .map(([cls, label, n]) => `<span class="c"><span class="led ${n ? cls : ""}"></span>${label} <b>${n}</b></span>`)
+        .join("") +
+        `<span class="c"><span class="led ${t.running ? "live" : ""}"></span>Live <b>${t.running}</b></span>` +
+        `<span class="c eta">ETA <b>${eta}</b></span>`;
+      currentRunSub.textContent = model.total ? `${t.done} / ${model.total} answered` : "";
+      answersMinBar.classList.toggle("hidden", !model.total);
+      answersMinText.textContent = `${J.plural(model.total, "answer")} hidden · ${t.done} done`;
+      updateSpark();
+    }
+
+    function estimateEta(t) {
+      const remaining = model.total - t.done;
+      if (remaining <= 0) return model.total ? "done" : "—";
+      if (runStatus !== "RUNNING") return "—";
+      const durations = [];
+      for (const q of model.questions.values()) {
+        if (q.startedAt != null && q.endedAt != null && q.endedAt > q.startedAt) durations.push(q.endedAt - q.startedAt);
+      }
+      if (!durations.length) return "…";
+      const avg = durations.reduce((a, b) => a + b, 0) / durations.length;
+      const parallel = Math.max(1, Number(model.run.fields.concurrency) || 1);
+      return J.formatDuration((avg * remaining) / parallel);
+    }
+
+    function updateSpark() {
+      if (!J.charts.available) {
+        sparkWrap.classList.add("hidden");
+        return;
+      }
+      const start = model.run.startedAt;
+      if (start == null || !model.completions.length) {
+        if (sparkChart) {
+          sparkChart.data.labels = [];
+          sparkChart.data.datasets[0].data = [];
+          sparkChart.update("none");
+        }
+        return;
+      }
+      const minutes = Math.max(1, Math.ceil((Date.now() - start) / 60000));
+      const buckets = new Array(minutes).fill(0);
+      for (const at of model.completions) {
+        const idx = Math.min(minutes - 1, Math.max(0, Math.floor((at - start) / 60000)));
+        buckets[idx] += 1;
+      }
+      const data = buckets.slice(-30);
+      const labels = data.map((_, i) => `${minutes - data.length + i + 1}m`);
+      if (!sparkChart) {
+        sparkChart = J.charts.track(
+          new Chart(sparkCanvas, {
+            type: "line",
+            data: { labels, datasets: [{ data, borderWidth: 1.5, tension: 0.35, fill: true, pointRadius: 0 }] },
+            options: {
+              responsive: false,
+              animation: false,
+              scales: { x: { display: false }, y: { display: false, beginAtZero: true } },
+              plugins: { tooltip: { enabled: true, displayColors: false } },
+            },
+          }),
+          themeSpark,
+        );
+        themeSpark(sparkChart);
+        sparkChart.update("none");
+      } else {
+        sparkChart.data.labels = labels;
+        sparkChart.data.datasets[0].data = data;
+        sparkChart.update("none");
+      }
+    }
+
+    function themeSpark(chart) {
+      const accent = J.charts.signal("accent");
+      chart.data.datasets[0].borderColor = accent;
+      chart.data.datasets[0].backgroundColor = J.charts.signal("accent-dim");
+    }
+
+    /* ---------- question frames ---------- */
+
+    function isOpen(q) {
+      if (openState.has(q.n)) return openState.get(q.n);
+      if (q.status === "done") return false;
+      return q.status !== "skipped";
+    }
+
+    function elapsedText(q) {
+      if (q.startedAt == null) return "";
+      const end = q.endedAt ?? Date.now();
+      return J.formatDuration(end - q.startedAt);
+    }
+
+    function frameClass(q) {
+      const parts = ["panel", "qframe", `s-${q.status}`];
+      if (q.status === "done" || q.status === "error") parts.push(`v-${J.verdictClass(q.verdict)}`);
+      if (isOpen(q)) parts.push("open");
+      return parts.join(" ");
+    }
+
+    function pillHtml(q) {
+      if (q.status === "done" || q.status === "error") {
+        return `<span class="pill ${J.verdictClass(q.verdict)}">${J.escapeHtml(q.verdict)}</span>`;
+      }
+      if (q.status === "skipped") return `<span class="pill wait">Skipped</span>`;
+      return `<span class="pill accent">${J.escapeHtml(questionStatusLabel(q))}</span>`;
+    }
+
+    function ledClass(q) {
+      if (q.status === "done" || q.status === "error") return `led ${J.verdictClass(q.verdict)}`;
+      if (q.status === "agent" || q.status === "judging") return "led live";
+      return "led";
+    }
+
+    function bodyHtml(q) {
+      const steps = q.steps.map((step) => J.stepHtml(step, q.startedAt));
+      if (q.status === "agent") {
+        steps.push(`<li class="live-row"><span class="dot led live"></span><span class="what">Agent · t${q.turn + 1}</span><span class="detail">waiting for reply…</span><span class="at"></span></li>`);
+      } else if (q.status === "judging") {
+        steps.push(`<li class="live-row"><span class="dot led live"></span><span class="what">Judge</span><span class="detail">grading turn ${q.turn}…</span><span class="at"></span></li>`);
+      }
+      let html = `<ol class="timeline">${steps.join("") || `<li><span class="dot"></span><span class="what">Queued</span><span class="detail">starting…</span><span class="at"></span></li>`}</ol>`;
+      if (q.status === "done" || q.status === "error") {
+        html += `<div class="qfindings">${J.findingsHtml(q.findings, { emptyText: q.explanation.trim() || "אין בעיות מהותיות" })}</div>`;
+      }
+      return html;
+    }
+
+    function headHtml(q) {
+      const turns = q.turn ? `${q.turn}${q.maxTurns ? `/${q.maxTurns}` : ""} turns` : "";
+      const meta = [turns, `<span class="qelapsed" data-n="${q.n}">${elapsedText(q)}</span>`].filter(Boolean).join(" · ");
+      return `
+        <span class="${ledClass(q)}"></span>
+        <span class="qnum">#${q.n}</span>
+        ${pillHtml(q)}
+        <span class="qmeta">${meta}</span>
+        <span class="qminis">${q.status === "done" ? J.findingMinis(q.counts) : ""}</span>
+        ${q.retries ? `<span class="qretry">429 ×${q.retries}</span>` : ""}
+        <span class="qspacer"></span>
+        <span class="chev" aria-hidden="true"></span>
+      `;
+    }
+
+    function createFrame(q) {
+      const article = document.createElement("article");
+      article.id = `qf-${q.n}`;
+      article.dataset.n = String(q.n);
+      article.innerHTML = `
+        <button type="button" class="qhead" aria-expanded="false"></button>
+        <div class="qtext"><div class="clamp" dir="auto"></div><button type="button" class="more hidden">more</button></div>
+        <div class="qbody"></div>
+      `;
+      article.querySelector(".qhead").addEventListener("click", () => {
+        const current = model.questions.get(q.n);
+        openState.set(q.n, !isOpen(current));
+        renderQuestion(current);
+      });
+      article.querySelector(".more").addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (fullText.has(q.n)) fullText.delete(q.n);
+        else fullText.add(q.n);
+        renderQuestion(model.questions.get(q.n));
+      });
+
+      let before = null;
+      for (const [n, el] of frameEls) {
+        if (n > q.n && (!before || n < Number(before.dataset.n))) before = el;
+      }
+      framesEl.insertBefore(article, before);
+      frameEls.set(q.n, article);
+      if (!replaying) J.motion.reveal([article], { y: 10, duration: 0.4 });
+      return article;
+    }
+
+    function renderQuestion(q) {
+      if (!q || q.status === "waiting") return;
+      const existed = frameEls.has(q.n);
+      const article = existed ? frameEls.get(q.n) : createFrame(q);
+      const wasDone = article.classList.contains("s-done") || article.classList.contains("s-error");
+
+      article.className = frameClass(q);
+      const head = article.querySelector(".qhead");
+      head.innerHTML = headHtml(q);
+      head.setAttribute("aria-expanded", isOpen(q) ? "true" : "false");
+
+      const text = article.querySelector(".qtext");
+      text.classList.toggle("full", fullText.has(q.n));
+      text.querySelector(".clamp").textContent = q.text || "—";
+      const more = text.querySelector(".more");
+      more.classList.toggle("hidden", (q.text || "").length < 140);
+      more.textContent = fullText.has(q.n) ? "less" : "more";
+
+      const body = article.querySelector(".qbody");
+      body.innerHTML = isOpen(q) ? bodyHtml(q) : "";
+
+      const nowDone = q.status === "done" || q.status === "error";
+      if (existed && !wasDone && nowDone && !replaying) {
+        J.motion.flash(article, J.verdictClass(q.verdict));
+      }
+    }
+
+    function followNewest() {
+      let newest = null;
+      for (const q of model.questions.values()) {
+        if (q.status === "agent" || q.status === "judging") {
+          if (!newest || q.n > newest.n) newest = q;
+        }
+      }
+      if (!newest || newest.n === lastFollowN) return;
+      lastFollowN = newest.n;
+      const el = frameEls.get(newest.n);
+      if (el) el.scrollIntoView({ block: "nearest", behavior: J.motion.enabled ? "smooth" : "auto" });
+    }
+
+    function jumpTo(n) {
+      const q = model.questions.get(n);
+      if (!q || q.status === "waiting") return;
+      if (rawToggle.getAttribute("aria-pressed") === "true") setRawView(false);
+      if (problemsToggle.getAttribute("aria-pressed") === "true" && /^(OK|PARTIAL)$/.test(q.verdict)) setProblemsOnly(false);
+      if (answersMinimized) setMinimized(false);
+      openState.set(n, true);
+      renderQuestion(q);
+      setFollow(false);
+      const el = frameEls.get(n);
+      if (el) {
+        el.scrollIntoView({ block: "center", behavior: J.motion.enabled ? "smooth" : "auto" });
+        J.motion.flash(el, q.status === "done" || q.status === "error" ? J.verdictClass(q.verdict) : "accent");
+      }
+    }
+
+    function tickClock() {
+      for (const el of framesEl.querySelectorAll(".qelapsed")) {
+        const q = model.questions.get(Number(el.dataset.n));
+        if (q && (q.status === "agent" || q.status === "judging")) el.textContent = elapsedText(q);
+      }
+      if (model.run.startedAt != null) {
+        const end = runStatus === "RUNNING" ? Date.now() : model.run.endedAt ?? Date.now();
+        runElapsed.textContent = `elapsed ${J.formatDuration(end - model.run.startedAt)}`;
+      } else {
+        runElapsed.textContent = "";
+      }
+      if (runStatus === "RUNNING" && model.total) {
+        pendingStrip = true;
+        schedule();
+      }
+    }
+
+    /* ---------- toolbar toggles ---------- */
+
+    function setProblemsOnly(on) {
+      problemsToggle.setAttribute("aria-pressed", on ? "true" : "false");
+      framesEl.classList.toggle("problems-only", on);
+      saveView();
+    }
+
+    function setFollow(on) {
+      follow = on;
+      followToggle.setAttribute("aria-pressed", on ? "true" : "false");
+      if (on) {
+        lastFollowN = null;
+        followNewest();
+      }
+    }
+
+    function setMinimized(on) {
+      answersMinimized = on;
+      currentRunEl.classList.toggle("answers-min", on);
+      minimizeBtn.textContent = on ? "Show answers" : "Minimize answers";
+      minimizeBtn.setAttribute("aria-expanded", on ? "false" : "true");
+      if (on) setFollow(false);
+      saveView();
+    }
+
+    function setRawView(on) {
+      if (on && answersMinimized) setMinimized(false);
+      rawToggle.setAttribute("aria-pressed", on ? "true" : "false");
+      rawPanel.classList.toggle("hidden", !on);
+      framesEl.classList.toggle("hidden", on);
+      if (on) logWell.scrollTop = logWell.scrollHeight;
+      saveView();
+    }
+
+    function saveView() {
+      try {
+        localStorage.setItem(
+          VIEW_STORAGE_KEY,
+          JSON.stringify({
+            problems: problemsToggle.getAttribute("aria-pressed") === "true",
+            raw: rawToggle.getAttribute("aria-pressed") === "true",
+            minimized: answersMinimized,
+          }),
+        );
+      } catch {
+        /* storage unavailable */
+      }
+    }
+
+    function loadView() {
+      try {
+        const view = JSON.parse(localStorage.getItem(VIEW_STORAGE_KEY) || "{}");
+        if (view.problems) setProblemsOnly(true);
+        if (view.raw) setRawView(true);
+        if (view.minimized) setMinimized(true);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    problemsToggle.addEventListener("click", () => setProblemsOnly(problemsToggle.getAttribute("aria-pressed") !== "true"));
+    followToggle.addEventListener("click", () => setFollow(!follow));
+    rawToggle.addEventListener("click", () => setRawView(rawToggle.getAttribute("aria-pressed") !== "true"));
+    minimizeBtn.addEventListener("click", () => setMinimized(!answersMinimized));
+    answersMinBar.addEventListener("click", () => setMinimized(false));
+    expandAllBtn.addEventListener("click", () => {
+      for (const q of model.questions.values()) {
+        openState.set(q.n, true);
+        renderQuestion(q);
+      }
+    });
+    collapseAllBtn.addEventListener("click", () => {
+      for (const q of model.questions.values()) {
+        openState.set(q.n, false);
+        renderQuestion(q);
+      }
+    });
+
+    /* ---------- view toolbar: segmented filter + "More" menu ---------- */
+
+    const segAll = $("segAll");
+    const segProblems = $("segProblems");
+
+    function syncViewToolbar() {
+      const problems = problemsToggle.getAttribute("aria-pressed") === "true";
+      segAll.classList.toggle("active", !problems);
+      segProblems.classList.toggle("active", problems);
+      segAll.setAttribute("aria-pressed", String(!problems));
+      segProblems.setAttribute("aria-pressed", String(problems));
+    }
+    new MutationObserver(syncViewToolbar).observe(problemsToggle, { attributes: true, attributeFilter: ["aria-pressed"] });
+    segAll.addEventListener("click", () => {
+      if (problemsToggle.getAttribute("aria-pressed") === "true") problemsToggle.click();
+    });
+    segProblems.addEventListener("click", () => {
+      if (problemsToggle.getAttribute("aria-pressed") !== "true") problemsToggle.click();
+    });
+    J.menu($("viewMenuBtn"), () => [
+      {
+        label: rawToggle.getAttribute("aria-pressed") === "true" ? "Show question frames" : "Show raw log",
+        icon: "list",
+        onClick: () => rawToggle.click(),
+      },
+      { label: "Expand all answers", icon: "expand", onClick: () => expandAllBtn.click() },
+      { label: "Collapse all answers", icon: "collapse", onClick: () => collapseAllBtn.click() },
+      { separator: true },
+      { label: answersMinimized ? "Show answers" : "Hide answers", icon: "eye", onClick: () => minimizeBtn.click() },
+    ]);
+    syncViewToolbar();
+
+    J.menu($("thisRunMore"), () => [
+      {
+        label: "Copy file path",
+        icon: "copy",
+        disabled: copyPathBtn.classList.contains("hidden"),
+        onClick: () => J.copyPath(copyPathBtn.dataset.path, null),
+      },
+      { separator: true },
+      { label: "Delete run", icon: "trash", danger: true, onClick: () => { if (currentRunName) removeRun(currentRunName); } },
+    ]);
+
+    const advSummary = $("advSummary");
+    function updateAdvSummary() {
+      const rows = limitEl.value.trim() || "all rows";
+      advSummary.textContent = `${rows} · ${concurrencyEl.value || "?"} parallel · ${maxTurnsEl.value || "?"} turns`;
+    }
+    for (const el of [limitEl, concurrencyEl, maxTurnsEl]) el.addEventListener("input", updateAdvSummary);
+    feedbackToggleEl.addEventListener("click", () => {
+      if (running) return;
+      setIncludeFeedback(!includeFeedbackOn());
+      localStorage.setItem(INCLUDE_FEEDBACK_STORAGE_KEY, includeFeedbackOn() ? "1" : "0");
+    });
+
+    for (const type of ["wheel", "touchmove"]) {
+      window.addEventListener(type, () => { if (follow && running) setFollow(false); }, { passive: true });
+    }
+    window.addEventListener("keydown", (event) => {
+      if (["PageUp", "PageDown", "Home", "End", "ArrowUp", "ArrowDown", " "].includes(event.key)) {
+        const tag = document.activeElement?.tagName;
+        if (tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT" && follow && running) setFollow(false);
+      }
+    });
+
+    logWell.addEventListener("scroll", () => {
+      const distance = logWell.scrollHeight - logWell.scrollTop - logWell.clientHeight;
+      stickToBottom = distance < 40;
+    });
+
+    /* ---------- prompts ---------- */
+
+    async function fetchJson(url, options) {
+      const res = await fetch(url, options);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    }
+
+    function updatePromptHint() {
+      const chars = systemPromptEl.value.length;
+      const name = activeScenario || "default";
+      promptHintEl.textContent = isPromptDirty()
+        ? `${name} · unsaved · ${chars} chars`
+        : `${name} · ${chars} chars · saved in prompts/${name}.md`;
+    }
+
+    function isPromptDirty() {
+      return systemPromptEl.value !== savedSystemPrompt;
+    }
+
+    function setPromptSaveVisible(visible) {
+      promptSaveBox.classList.toggle("hidden", !visible);
+      if (!visible) saveAsRow.classList.add("hidden");
+    }
+
+    function syncPromptSaveBox() {
+      setPromptSaveVisible(isPromptDirty());
+      updatePromptHint();
+    }
+
+    function renderScenarioOptions(names, selected) {
+      promptScenarios = names.slice();
+      promptScenarioEl.innerHTML = "";
+      if (!names.length) {
+        const opt = document.createElement("option");
+        opt.value = "default";
+        opt.textContent = "default";
+        promptScenarioEl.appendChild(opt);
+        return;
+      }
+      for (const name of names) {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        promptScenarioEl.appendChild(opt);
+      }
+      const next = names.includes(selected) ? selected : names[0];
+      promptScenarioEl.value = next;
+      activeScenario = next;
+    }
+
+    function applyAdviceFlowDefaults() {
+      if (activeScenario !== "advice-flow") return;
+      concurrencyEl.value = "2";
+      maxTurnsEl.value = "12";
+      const adviceFile = "advice-flow-scenarios.csv";
+      for (const opt of inputFileEl.options) {
+        if (opt.value === adviceFile) {
+          inputFileEl.value = adviceFile;
+          break;
+        }
+      }
+      updateAdvSummary();
+    }
+
+    async function loadScenario(name) {
+      const data = await fetchJson(`/api/prompts/${encodeURIComponent(name)}`);
+      activeScenario = data.name || name;
+      savedSystemPrompt = data.text || "";
+      systemPromptEl.value = savedSystemPrompt;
+      localStorage.setItem(SCENARIO_STORAGE_KEY, activeScenario);
+      promptScenarioEl.value = activeScenario;
+      syncPromptSaveBox();
+      applyAdviceFlowDefaults();
+    }
+
+    async function savePromptChanges() {
+      const name = activeScenario || "default";
+      const data = await fetchJson(`/api/prompts/${encodeURIComponent(name)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: systemPromptEl.value }),
+      });
+      savedSystemPrompt = data.text;
+      activeScenario = data.name || name;
+      localStorage.setItem(SCENARIO_STORAGE_KEY, activeScenario);
+      syncPromptSaveBox();
+    }
+
+    function discardPromptChanges() {
+      systemPromptEl.value = savedSystemPrompt;
+      saveAsNameEl.value = "";
+      syncPromptSaveBox();
+    }
+
+    async function createPromptScenario() {
+      const name = saveAsNameEl.value.trim();
+      if (!name) {
+        saveAsNameEl.focus();
+        return;
+      }
+      const data = await fetchJson(`/api/prompts/${encodeURIComponent(name)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: systemPromptEl.value }),
+      });
+      if (!promptScenarios.includes(data.name)) {
+        renderScenarioOptions([...promptScenarios, data.name].sort((a, b) => a.localeCompare(b)), data.name);
+      } else {
+        promptScenarioEl.value = data.name;
+      }
+      activeScenario = data.name;
+      savedSystemPrompt = data.text;
+      localStorage.setItem(SCENARIO_STORAGE_KEY, activeScenario);
+      saveAsNameEl.value = "";
+      syncPromptSaveBox();
+    }
+
+    async function loadJudgePrompt() {
+      const data = await fetchJson("/api/prompts");
+      defaultSystemPrompt = data.defaultPrompt || "";
+      const stored = localStorage.getItem(SCENARIO_STORAGE_KEY);
+      const names = data.scenarios || [];
+      const selected =
+        (stored && names.includes(stored) && stored) ||
+        (names.includes("default") ? "default" : names[0] || "default");
+      renderScenarioOptions(names, selected);
+      await loadScenario(selected);
+    }
+
+    function parseConcurrency(raw, fallback = 2) {
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed)) return fallback;
+      return Math.min(32, Math.max(1, Math.floor(parsed)));
+    }
+
+    function parseMaxTurns(raw, fallback = 4) {
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed)) return fallback;
+      return Math.min(32, Math.max(1, Math.floor(parsed)));
+    }
+
+    async function loadConfig() {
+      const data = await fetchJson("/api/config");
+      const storedConcurrency = localStorage.getItem(CONCURRENCY_STORAGE_KEY);
+      concurrencyEl.value = String(parseConcurrency(storedConcurrency || data.defaultConcurrency, data.defaultConcurrency || 2));
+      const storedTurns = localStorage.getItem(MAX_TURNS_STORAGE_KEY);
+      maxTurnsEl.value = String(parseMaxTurns(storedTurns || data.defaultMaxTurns, data.defaultMaxTurns || 4));
+      setIncludeFeedback(localStorage.getItem(INCLUDE_FEEDBACK_STORAGE_KEY) === "1");
+      updateAdvSummary();
+    }
+
+    async function loadInputs() {
+      const data = await fetchJson("/api/inputs");
+      inputFileEl.innerHTML = "";
+      if (!data.files || data.files.length === 0) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.disabled = true;
+        opt.selected = true;
+        opt.textContent = "no .xlsx/.csv in input/";
+        inputFileEl.appendChild(opt);
+        startBtn.disabled = true;
+        return;
+      }
+      for (const file of data.files) {
+        const opt = document.createElement("option");
+        opt.value = file;
+        opt.textContent = file;
+        inputFileEl.appendChild(opt);
+      }
+      if (!running) startBtn.disabled = false;
+    }
+
+    /* ---------- backend + client selection ---------- */
+
+    function markSelected(tbody) {
+      for (const tr of tbody.querySelectorAll("tr")) {
+        const radio = tr.querySelector('input[type="radio"]');
+        tr.classList.toggle("selected", Boolean(radio && radio.checked));
+      }
+    }
+
+    function bindRowSelect(tr, tbody) {
+      tr.addEventListener("click", (event) => {
+        if (running) return;
+        const radio = tr.querySelector('input[type="radio"]');
+        if (!radio || event.target === radio || event.target.tagName === "INPUT") return;
+        radio.checked = true;
+        radio.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      tr.addEventListener("change", () => markSelected(tbody));
+    }
+
+    const AGENT_NAMES = { pola: "Pola", miluim: "Mitve Miluim" };
+    const ENV_ORDER = ["local", "dev", "stg"];
+
+    function selectedPreset() {
+      return clientPresets.find((item) => item.id === selectedAgentId) || null;
+    }
+
+    function selectAgent(id) {
+      selectedAgentId = id;
+      localStorage.setItem(CLIENT_STORAGE_KEY, id);
+      renderAgents();
+    }
+
+    // Switching agent keeps the environment when that agent has it.
+    function pickAgent(agent) {
+      if (agent === "custom") return selectAgent("custom");
+      const env = (selectedPreset() || {}).env || "local";
+      const next =
+        clientPresets.find((item) => item.agent === agent && item.env === env) ||
+        clientPresets.find((item) => item.agent === agent);
+      if (next) selectAgent(next.id);
+    }
+
+    function pickEnv(env) {
+      const current = selectedPreset();
+      const next = current && clientPresets.find((item) => item.agent === current.agent && item.env === env);
+      if (next) selectAgent(next.id);
+    }
+
+    function maskClientId(id) {
+      const value = String(id || "");
+      return value.length <= 12 ? value : `${value.slice(0, 4)}…${value.slice(-3)}`;
+    }
+
+    function segButton(label, { active, onClick, led }) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute("role", "radio");
+      button.setAttribute("aria-checked", String(active));
+      button.className = active ? "active" : "";
+      button.disabled = running;
+      if (led !== undefined) {
+        const dot = document.createElement("span");
+        dot.className = `led ${led}`;
+        button.appendChild(dot);
+      }
+      button.appendChild(document.createTextNode(label));
+      button.addEventListener("click", () => { if (!running) onClick(); });
+      return button;
+    }
+
+    function renderTargetCard(preset) {
+      if (!preset) {
+        targetCard.classList.add("hidden");
+        return;
+      }
+      targetCard.classList.remove("hidden");
+      const backend = backendsByTarget[preset.target];
+      const led = backend ? (backend.live ? "ok" : "false") : "";
+      const status = backend ? (backend.live ? "live" : "down") : "probing";
+      targetCard.innerHTML = `
+        <div class="row"><span class="k">Backend</span><span class="v">${J.escapeHtml(backend ? backend.url : preset.target)}</span><span class="status" style="margin-left:auto"><span class="led ${led}"></span>${status}</span></div>
+        <div class="row"><span class="k">Client ID</span><span class="v dim" title="x-pola-client-id">${J.escapeHtml(maskClientId(preset.clientId))}</span></div>
+      `;
+    }
+
+    function renderAgents() {
+      const known = new Set([...clientPresets.map((item) => item.id), "custom"]);
+      const wanted = localStorage.getItem(CLIENT_STORAGE_KEY) || selectedAgentId;
+      if (clientPresets.length) selectedAgentId = known.has(wanted) ? wanted : clientPresets[0].id;
+
+      const preset = selectedPreset();
+      const agents = [...new Set(clientPresets.map((item) => item.agent))];
+
+      agentSeg.replaceChildren(
+        ...agents.map((agent) =>
+          segButton(AGENT_NAMES[agent] || agent, { active: preset?.agent === agent, onClick: () => pickAgent(agent) }),
+        ),
+        segButton("Other", { active: !preset && selectedAgentId === "custom", onClick: () => pickAgent("custom") }),
+      );
+
+      envField.classList.toggle("hidden", !preset);
+      envSeg.replaceChildren(
+        ...clientPresets
+          .filter((item) => preset && item.agent === preset.agent)
+          .sort((x, y) => ENV_ORDER.indexOf(x.env) - ENV_ORDER.indexOf(y.env))
+          .map((item) => {
+            const backend = backendsByTarget[item.target];
+            return segButton(item.env, {
+              active: item.id === preset.id,
+              led: backend ? (backend.live ? "ok" : "false") : "",
+              onClick: () => pickEnv(item.env),
+            });
+          }),
+      );
+
+      renderTargetCard(preset);
+      customFields.classList.toggle("hidden", Boolean(preset));
+      for (const input of customFields.querySelectorAll("input")) input.disabled = running;
+    }
+
+    $("customClientId").value = localStorage.getItem(CUSTOM_CLIENT_STORAGE_KEY) || "";
+    $("customClientId").addEventListener("input", (event) => {
+      localStorage.setItem(CUSTOM_CLIENT_STORAGE_KEY, event.target.value);
+    });
+
+    async function loadClients() {
+      const data = await fetchJson("/api/clients");
+      clientPresets = data.clients || [];
+      if (!localStorage.getItem(CLIENT_STORAGE_KEY) && data.defaultId) selectedAgentId = data.defaultId;
+      renderAgents();
+    }
+
+    async function loadBackends() {
+      refreshBackendsBtn.disabled = true;
+      try {
+        const data = await fetchJson("/api/backends");
+        backendsByTarget = Object.fromEntries((data.backends || []).map((backend) => [backend.id, backend]));
+        renderAgents();
+      } finally {
+        if (!running) refreshBackendsBtn.disabled = false;
+      }
+    }
+
+    /* ---------- current run ---------- */
+    /* The full report list lives on /reports. */
+
+    function renderCurrentRun(run) {
+      if (!run) {
+        copyPathBtn.classList.add("hidden");
+        currentRunTags.classList.add("hidden");
+        currentRunTags.innerHTML = "";
+        return;
+      }
+      if (run.path) {
+        copyPathBtn.classList.remove("hidden");
+        copyPathBtn.dataset.path = run.path;
+        copyPathBtn.title = run.path;
+      } else {
+        copyPathBtn.classList.add("hidden");
+      }
+      J.renderRunTags(currentRunTags, run);
+    }
+
+    async function loadRuns(currentFile) {
+      currentRunName = currentFile || null;
+      if (!currentFile) {
+        renderCurrentRun(null);
+        return;
+      }
+      const data = await fetchJson("/api/runs");
+      const current = (data.runs || []).find((run) => run.name === currentFile);
+      downloadRow.classList.remove("hidden");
+      thisRunName.textContent = current?.partial ? `${currentFile} · partial` : currentFile;
+      viewLink.href = `/report?run=${encodeURIComponent(currentFile)}`;
+      downloadControl.setRun(currentFile);
+      if (current?.summary) showSummary(current.summary);
+      renderCurrentRun(current);
+    }
+
+    /* ---------- stream ---------- */
+
+    function handleExit(payload, { replay = false } = {}) {
+      setRunning(false);
+      const stopped = payload.status === "STOPPED";
+      const cut = model.interrupt(stopped ? "run stopped before this question finished" : "run ended before this question finished");
+      for (const n of cut) pendingQs.add(n);
+      const failed = model.run.fatal.length || (!stopped && (cut.length || payload.code));
+      const status = stopped ? "STOPPED" : failed ? "FAILED" : "DONE";
+      setStatus(status);
+      model.run.endedAt = model.run.endedAt ?? payload.endedAt ?? Date.now();
+      const summary = payload.summary || model.run.summary;
+      if (summary) {
+        downloadRow.classList.remove("hidden");
+        showSummary(summary);
+      }
+      if (!replay && stopped) {
+        J.toast(payload.saved ? "Partial report saved. Find it under Reports." : "Run stopped. Nothing was saved.");
+      }
+      pendingRun = true;
+      pendingStrip = true;
+      schedule();
+      loadRuns(payload.outputFile || null).catch((err) => {
+        if (!replay) uiNote(`Failed to refresh runs: ${err.message}`);
+      });
+    }
+
+    function ensureStream() {
+      if (eventSource) return;
+      eventSource = new EventSource("/api/eval/stream");
+      eventSource.onmessage = (event) => {
+        let payload;
+        try {
+          payload = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+
+        if (payload.type === "status") {
+          if (payload.status === "RUNNING") {
+            setStatus("RUNNING");
+            setRunning(true);
+          } else if (!running && runStatus === "RUNNING") {
+            setStatus("IDLE");
+          }
+          return;
+        }
+
+        if (payload.type === "replay") {
+          replaying = true;
+          launchedHere = false;
+          resetLive();
+          for (const entry of payload.lines || []) ingestLine(entry.line, entry.stream, null);
+          if (payload.startedAt) model.run.startedAt = payload.startedAt;
+          flush();
+          replaying = false;
+          renderRailSummary();
+          if (payload.exit) handleExit(payload.exit, { replay: true });
+          else if (running) setFollow(follow);
+          return;
+        }
+
+        if (payload.type === "log") {
+          ingestLine(payload.line, payload.stream, Date.now());
+          return;
+        }
+
+        if (payload.type === "exit") {
+          handleExit(payload);
+        }
+      };
+      eventSource.onerror = () => {
+        // The browser reconnects on its own; the server replays the run on reconnect.
+      };
+    }
+
+    formEl.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (running) return;
+
+      const inputFile = inputFileEl.value;
+      if (!inputFile) return;
+      launchedHere = true;
+
+      const preset = selectedPreset();
+      const isCustom = !preset;
+      const target = isCustom ? "custom" : preset.target;
+      const customUrl = ($("customUrl") || {}).value || "";
+      const limit = limitEl.value.trim();
+      const concurrency = parseConcurrency(concurrencyEl.value, 2);
+      localStorage.setItem(CONCURRENCY_STORAGE_KEY, String(concurrency));
+      concurrencyEl.value = String(concurrency);
+      const maxTurns = parseMaxTurns(maxTurnsEl.value, 4);
+      localStorage.setItem(MAX_TURNS_STORAGE_KEY, String(maxTurns));
+      maxTurnsEl.value = String(maxTurns);
+      const includeFeedback = includeFeedbackOn();
+      localStorage.setItem(INCLUDE_FEEDBACK_STORAGE_KEY, includeFeedback ? "1" : "0");
+      const customClientId = (($("customClientId") || {}).value || "").trim();
+      const clientId = isCustom ? customClientId : preset.id;
+      if (isCustom && !customUrl.trim()) {
+        uiNote("Start failed: enter a backend URL for the custom option");
+        return;
+      }
+      if (!clientId) {
+        uiNote("Start failed: enter a custom client ID");
+        return;
+      }
+
+      resetLive();
+      model.run.startedAt = Date.now();
+      downloadRow.classList.add("hidden");
+      hideSummary();
+      setRunning(true);
+      setStatus("RUNNING");
+      setFollow(true);
+      ensureStream();
+
+      try {
+        await fetchJson("/api/eval/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            inputFile,
+            target,
+            customUrl: isCustom ? customUrl : undefined,
+            limit: limit === "" ? undefined : Number(limit),
+            concurrency,
+            maxTurns,
+            clientId,
+            systemPrompt: systemPromptEl.value,
+            promptName: activeScenario || "default",
+            includeFeedback,
+          }),
+        });
+      } catch (err) {
+        setRunning(false);
+        setStatus("IDLE");
+        uiNote(`Start failed: ${err.message}`);
+      }
+    });
+
+    let stopDialogOpen = false;
+
+    async function requestStop() {
+      if (stopDialogOpen || !running) return;
+      stopDialogOpen = true;
+      let save = false;
+      try {
+        const tally = model.tally();
+        const judged = tally.OK + tally.PARTIAL + tally.FALSE + tally.ERROR;
+        if (judged === 0) {
+          const confirmed = await J.confirmDialog({
+            title: "Stop this run?",
+            body: "Nothing has been judged yet, so nothing will be saved.",
+            confirmLabel: "Stop run",
+            cancelLabel: "Keep running",
+            danger: true,
+          });
+          if (!confirmed) return;
+        } else {
+          const choice = await J.choiceDialog({
+            title: "Stop this run?",
+            body: `${judged} of ${model.total} questions have been judged. Save them as a partial report, or discard the run?`,
+            choices: [
+              { label: "Keep running", value: "keep", cancel: true },
+              { label: "Discard & stop", value: "discard", tone: "danger" },
+              { label: "Save & stop", value: "save", tone: "primary" },
+            ],
+          });
+          if (choice == null || choice === "keep") return;
+          save = choice === "save";
+        }
+        // The run may have ended while the dialog was open.
+        if (!running) return;
+        await fetchJson("/api/eval/stop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ save }),
+        });
+      } catch (err) {
+        uiNote(`Stop failed: ${err.message}`);
+      } finally {
+        stopDialogOpen = false;
+      }
+    }
+
+    stopBtn.addEventListener("click", requestStop);
+    stopBtnSummary.addEventListener("click", requestStop);
+    editConfigBtn.addEventListener("click", expandRail);
+
+    copyPathBtn.addEventListener("click", () => J.copyPath(copyPathBtn.dataset.path, copyPathBtn));
+    $("deleteCurrentBtn").addEventListener("click", () => {
+      if (currentRunName) removeRun(currentRunName);
+    });
+
+    async function removeRun(name) {
+      if (!(await J.deleteRun(name))) return;
+      if (currentRunName === name) {
+        currentRunName = null;
+        downloadRow.classList.add("hidden");
+      }
+    }
+
+    systemPromptEl.addEventListener("input", syncPromptSaveBox);
+
+    promptScenarioEl.addEventListener("change", async () => {
+      const next = promptScenarioEl.value;
+      if (next === activeScenario && !isPromptDirty()) return;
+      if (isPromptDirty()) {
+        const ok = await J.confirmDialog({
+          title: "Discard unsaved changes?",
+          detail: activeScenario || "this scenario",
+          body: "Switching scenarios replaces the prompt text you edited.",
+          confirmLabel: "Discard changes",
+          cancelLabel: "Keep editing",
+          danger: true,
+        });
+        if (!ok) {
+          promptScenarioEl.value = activeScenario;
+          return;
+        }
+      }
+      try {
+        await loadScenario(next);
+      } catch (err) {
+        uiNote(`Failed to load scenario: ${err.message}`);
+      }
+    });
+
+    resetPromptBtn.addEventListener("click", () => {
+      systemPromptEl.value = defaultSystemPrompt;
+      syncPromptSaveBox();
+      systemPromptEl.focus();
+    });
+
+    savePromptBtn.addEventListener("click", () => {
+      savePromptChanges().catch((err) => uiNote(`Save failed: ${err.message}`));
+    });
+    saveAsPromptBtn.addEventListener("click", () => {
+      saveAsRow.classList.toggle("hidden");
+      if (!saveAsRow.classList.contains("hidden")) saveAsNameEl.focus();
+    });
+    confirmSaveAsBtn.addEventListener("click", () => {
+      createPromptScenario().catch((err) => uiNote(`Save as failed: ${err.message}`));
+    });
+    saveAsNameEl.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      createPromptScenario().catch((err) => uiNote(`Save as failed: ${err.message}`));
+    });
+    discardPromptBtn.addEventListener("click", discardPromptChanges);
+
+    window.addEventListener("beforeunload", (event) => {
+      if (!isPromptDirty()) return;
+      event.preventDefault();
+      event.returnValue = "";
+    });
+
+    refreshBackendsBtn.addEventListener("click", () => {
+      loadBackends().catch((err) => uiNote(`Backend probe failed: ${err.message}`));
+    });
+
+    async function boot() {
+      J.theme.mountToggle($("themeToggle"));
+      J.startClock($("clock"));
+      loadView();
+      setStatus("IDLE");
+      renderRunFrame();
+      J.motion.reveal(document.querySelectorAll(".rail .panel, .current-run > .panel:not(.hidden)"));
+      setInterval(tickClock, 1000);
+
+      const tasks = [
+        ["system prompt", loadJudgePrompt],
+        ["config", loadConfig],
+        ["input files", loadInputs],
+        ["backends", loadBackends],
+        ["clients", loadClients],
+        ["runs", () => loadRuns(null)],
+      ];
+      await Promise.all(
+        tasks.map(async ([label, task]) => {
+          try {
+            await task();
+          } catch (err) {
+            uiNote(`Failed to load ${label}: ${err.message}`);
+          }
+        }),
+      );
+      applyAdviceFlowDefaults();
+      if (!running) setRunning(false);
+      ensureStream();
+    }
+
+    boot().catch((err) => uiNote(`Boot failed: ${err.message}`));
+  </script>
+</body>
+</html>

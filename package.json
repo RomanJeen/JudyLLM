@@ -1,0 +1,37 @@
+{
+  "name": "evals",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "eval": "node --env-file-if-exists=.env run-eval.mjs",
+    "eval:local": "EVAL_TARGET=local node --env-file-if-exists=.env run-eval.mjs",
+    "eval:dev": "EVAL_TARGET=dev CONCURRENCY=2 node --env-file-if-exists=.env run-eval.mjs",
+    "eval:limit": "LIMIT=5 node --env-file-if-exists=.env run-eval.mjs",
+    "eval:limit:dev": "EVAL_TARGET=dev CONCURRENCY=2 LIMIT=5 node --env-file-if-exists=.env run-eval.mjs",
+    "eval:rag": "INPUT_FILE=pola_test_rag.xlsx node --env-file-if-exists=.env run-eval.mjs",
+    "eval:rag:dev": "EVAL_TARGET=dev CONCURRENCY=2 INPUT_FILE=pola_test_rag.xlsx node --env-file-if-exists=.env run-eval.mjs",
+    "phoenix:run": "node --env-file-if-exists=.env run-phoenix-calibration.mjs run",
+    "phoenix:compare": "node --env-file-if-exists=.env run-phoenix-calibration.mjs compare",
+    "phoenix:clean": "node --env-file-if-exists=.env run-phoenix-calibration.mjs clean",
+    "ui": "node --env-file-if-exists=.env ui-server.mjs",
+    "export": "node report-export.mjs",
+    "test": "node --check backend-config.mjs && node --check run-eval.mjs && node --check judge.mjs && node --check excel-writer.mjs && node --check run-store.mjs && node --check report-export.mjs && node --check run-phoenix-calibration.mjs && node --check ui-server.mjs && node --check public/judy-ui.js && node --check public/judy-live.js && node --check public/judy-live-3d.mjs && node --test backend-wait.test.mjs live-director.test.mjs run-store.test.mjs judge.test.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.922.0",
+    "@fontsource/frank-ruhl-libre": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@fontsource/rubik": "5.3.0",
+    "@smithy/node-http-handler": "^4.6.1",
+    "chart.js": "4.5.1",
+    "csv-parse": "^6.2.1",
+    "exceljs": "^4.4.0",
+    "gsap": "3.15.0",
+    "three": "0.170.0"
+  }
+}

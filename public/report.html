@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Judy — Report</title>
+  <script>
+    try { document.documentElement.dataset.theme = localStorage.getItem("judy-theme") || "light"; } catch (e) {}
+  </script>
+  <link rel="icon" href="/judy-mark.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/judy-mark.svg" />
+  <link rel="stylesheet" href="/judy-theme.css" />
+  <style>
+    html, body { height: 100%; }
+    body { overflow: hidden; }
+
+    .page {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .page > * { flex: 0 0 auto; }
+    .page > .workspace { flex: 1 1 auto; }
+
+    /* ---------- run log ---------- */
+
+    .runlog { margin: 1rem 1.5rem 0; }
+    .runlog .panel-body { display: grid; gap: 1rem; max-height: 46vh; overflow: auto; }
+    .runlog-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0.8rem 1.25rem; }
+    .runlog-fatal { border: 1px solid var(--false); background: var(--false-dim); color: var(--false); border-radius: var(--r); padding: 0.6rem 0.85rem; font-size: 0.93rem; overflow-wrap: anywhere; }
+    .runlog-notes { margin: 0; padding-inline-start: 1.2rem; font-size: 0.87rem; color: var(--text-soft); display: grid; gap: 0.2rem; }
+    .runlog summary { cursor: pointer; min-height: 28px; }
+    .runlog-raw {
+      margin: 0;
+      padding: 0.85rem 1rem;
+      background: var(--bg-2);
+      border: 1px solid var(--hair);
+      border-radius: var(--r);
+      font-family: var(--f-mono);
+      font-size: 0.8rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      color: var(--text-soft);
+      direction: ltr;
+      text-align: left;
+    }
+    .runlog-raw .err { color: var(--false); }
+    .runlog-raw .ts { color: var(--muted); user-select: none; }
+
+    .box.timeline-box .timeline { padding: 0.8rem 1.1rem 0.95rem; }
+    .row-retry { color: var(--error); }
+
+    /* ---------- top bar ---------- */
+
+    .run-title {
+      display: grid;
+      gap: 0.15rem;
+      min-width: 0;
+      padding-inline-start: 1rem;
+      margin-inline-start: 0.5rem;
+      border-inline-start: 1px solid var(--hair-strong);
+    }
+    .run-name {
+      font-family: var(--f-display);
+      font-weight: 700;
+      font-size: 1.2rem;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .run-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 0.5rem; align-items: center; font-size: 0.87rem; color: var(--muted); }
+
+    /* ---------- overview: KPI row + insights ---------- */
+
+    .overview { margin: 1.1rem 1.5rem 0; display: grid; gap: 0.9rem; }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: minmax(15rem, 1fr) minmax(20rem, 2fr) minmax(9rem, auto);
+    }
+    .kpi {
+      padding: 1.1rem 1.5rem 1.2rem;
+      border-inline-end: 1px solid var(--hair);
+      min-width: 0;
+      display: grid;
+      align-content: start;
+      gap: 0.6rem;
+    }
+    .kpi:last-child { border-inline-end: 0; }
+    .kpi .section-title { margin: 0; }
+
+    .metric-sub { color: var(--muted); font-size: 0.87rem; }
+    .metric-sub strong { color: var(--text-soft); font-weight: 600; }
+    .error-reasons { font-size: 0.87rem; color: var(--error); line-height: 1.45; overflow-wrap: anywhere; }
+
+    .dist-bar { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: var(--wait); gap: 2px; margin-top: 0.2rem; }
+    .dist-bar span { display: block; height: 100%; }
+    .verdict-line { display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem; font-size: 0.93rem; color: var(--text-soft); }
+    .verdict-line .vl { display: inline-flex; align-items: center; gap: 0.45rem; }
+    .verdict-line .vl b { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+
+    .insights summary {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      min-height: 52px;
+      padding: 0.5rem 1.25rem;
+      cursor: pointer;
+      list-style: none;
+      font-family: var(--f-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      border-radius: var(--r-lg);
+    }
+    .insights summary::-webkit-details-marker { display: none; }
+    .insights summary:hover { background: var(--panel-2); }
+    .insights summary:focus-visible { outline: none; box-shadow: var(--accent-glow); }
+    .insights summary .aside { font-family: var(--f-ui); font-weight: 400; font-size: 0.87rem; color: var(--muted); }
+    .insights summary .chev-icon { margin-inline-start: auto; color: var(--muted); transition: transform 150ms ease; }
+    .insights[open] summary .chev-icon { transform: rotate(180deg); }
+    .insights[open] summary { border-bottom: 1px solid var(--hair); border-radius: var(--r-lg) var(--r-lg) 0 0; }
+    .insights-body { display: grid; grid-template-columns: minmax(18rem, 1fr) minmax(18rem, 1.3fr) minmax(14rem, 1fr); }
+    .ov-cell { padding: 1.1rem 1.5rem 1.25rem; border-inline-end: 1px solid var(--hair); min-width: 0; display: grid; align-content: start; gap: 0.7rem; }
+    .ov-cell:last-child { border-inline-end: 0; }
+    .ov-cell .section-title { margin: 0; }
+
+    .donut-wrap { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 1rem; align-items: center; }
+    .donut { position: relative; width: 120px; height: 120px; }
+    .donut canvas { position: absolute; inset: 0; }
+    .donut-center {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      text-align: center;
+      pointer-events: none;
+    }
+    .donut-center b { font-family: var(--f-display); font-size: 1.6rem; line-height: 1; }
+    .donut-center small { font-size: 0.73rem; color: var(--muted); }
+
+    .legend { display: grid; gap: 0.2rem; }
+    .legend-item {
+      font: inherit;
+      font-size: 0.87rem;
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      gap: 0.6rem;
+      align-items: center;
+      min-height: 30px;
+      padding: 0.1rem 0.5rem;
+      border: 1px solid transparent;
+      border-radius: var(--r-sm);
+      background: transparent;
+      color: var(--text-soft);
+      cursor: pointer;
+      text-align: left;
+    }
+    .legend-item:hover { background: var(--raised); color: var(--text); }
+    .legend-item.off { opacity: 0.45; }
+    .legend-item .n { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+    .legend-item .pct { color: var(--muted); font-size: 0.8rem; min-width: 2.8rem; text-align: right; }
+
+    .chart-box { position: relative; height: 120px; }
+    .no-charts .insights { display: none; }
+
+    .issue-grid { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .issue-filter {
+      font: inherit;
+      display: inline-flex;
+      align-items: baseline;
+      gap: 0.45rem;
+      min-height: 30px;
+      padding: 0.15rem 0.65rem;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      font-size: 0.87rem;
+      cursor: pointer;
+    }
+    .issue-filter strong { font-weight: 700; }
+    .issue-filter .he { font-family: var(--f-read); font-weight: 600; }
+    .issue-filter .en { opacity: 0.75; font-size: 0.73rem; }
+    .issue-filter:hover { border-color: currentColor; }
+    .issue-filter[aria-pressed="true"] { border-color: currentColor; box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 35%, transparent); }
+    .issue-filter:focus-visible,
+    .legend-item:focus-visible { outline: none; box-shadow: var(--accent-glow); }
+
+    .ov-empty { color: var(--muted); font-size: 0.87rem; }
+
+    /* ---------- banner + toolbar ---------- */
+
+    .banner {
+      margin: 1rem 1.5rem 0;
+      padding: 0.5rem 0.75rem 0.5rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border: 1px solid var(--accent);
+      border-radius: var(--r-lg);
+      background: var(--accent-dim);
+      color: var(--text);
+      font-size: 0.93rem;
+      font-weight: 500;
+    }
+    .banner .btn { margin-inline-start: auto; }
+
+    .toolbar {
+      margin: 1rem 1.5rem 0;
+      padding: 0.75rem 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.6rem 1rem;
+    }
+    .chips { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .chip:not([aria-pressed="true"]) .led { opacity: 0.9; }
+    .search-wrap { position: relative; flex: 1 1 18rem; max-width: 32rem; }
+    .search-wrap .icon { position: absolute; inset-inline-start: 0.8rem; top: 50%; margin-top: -0.58em; color: var(--muted); pointer-events: none; }
+    #search { font-family: var(--f-read); font-size: 1rem; padding-inline-start: 2.4rem; }
+    .showing { margin-inline-start: auto; font-size: 0.87rem; font-weight: 500; color: var(--text-soft); }
+    .keys { color: var(--muted); font-size: 0.8rem; }
+
+    /* ---------- workspace ---------- */
+
+    .workspace {
+      margin: 1rem 1.5rem 1.5rem;
+      display: grid;
+      grid-template-columns: minmax(19rem, 25rem) minmax(0, 1fr);
+      min-height: 26rem;
+      overflow: hidden;
+    }
+
+    .list-pane {
+      border-inline-end: 1px solid var(--hair);
+      overflow: auto;
+      min-height: 0;
+      background: var(--panel-2);
+    }
+
+    .row-item {
+      display: grid;
+      gap: 0.4rem;
+      width: 100%;
+      text-align: start;
+      padding: 0.85rem 1rem 0.9rem;
+      border: 0;
+      border-bottom: 1px solid var(--hair);
+      border-inline-start: 4px solid var(--wait);
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      transition: background 120ms ease;
+    }
+    .row-item:hover { background: var(--raised); }
+    .row-item:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
+    .row-item.v-ok { border-inline-start-color: var(--ok); }
+    .row-item.v-partial { border-inline-start-color: var(--partial); }
+    .row-item.v-false { border-inline-start-color: var(--false); }
+    .row-item.v-error { border-inline-start-color: var(--error); }
+    .row-item[aria-selected="true"] { background: var(--panel); box-shadow: inset 0 0 0 2px var(--accent); }
+
+    .row-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; direction: ltr; }
+    .row-num { font-family: var(--f-display); font-weight: 700; font-size: 1.15rem; }
+    .row-meta { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--muted); }
+    .row-q {
+      font-family: var(--f-read);
+      font-size: 0.98rem;
+      line-height: 1.5;
+      color: var(--text);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .row-issues { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+
+    .detail-pane { overflow: auto; min-height: 0; }
+
+    .detail-bar {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: color-mix(in srgb, var(--panel) 94%, transparent);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--hair);
+      padding: 0.65rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      direction: ltr;
+    }
+    .detail-bar .pos { font-size: 0.93rem; color: var(--text-soft); }
+    .detail-bar .pos strong { font-family: var(--f-display); font-size: 1.15rem; color: var(--text); }
+    .detail-bar .nav { margin-inline-start: auto; display: flex; gap: 0.5rem; }
+
+    .detail-body { padding: 1.5rem 1.75rem 3.5rem; max-width: 84rem; }
+
+    .question {
+      font-family: var(--f-display);
+      font-size: clamp(1.4rem, 2vw, 1.85rem);
+      font-weight: 700;
+      line-height: 1.45;
+      margin: 0 0 1.5rem;
+    }
+
+    .box { border: 1px solid var(--hair); border-radius: var(--r-lg); background: var(--panel); margin-bottom: 1.5rem; min-width: 0; box-shadow: var(--shadow-sm); overflow: hidden; }
+    .box-head {
+      padding: 0.7rem 1.1rem;
+      border-bottom: 1px solid var(--hair);
+      background: var(--panel-2);
+      direction: ltr;
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      font-size: 0.93rem;
+      font-weight: 600;
+      color: var(--text-soft);
+    }
+    .box-head .aside { margin-inline-start: auto; color: var(--muted); font-weight: 400; font-size: 0.87rem; }
+    .box-body { padding: 1.1rem 1.25rem 1.25rem; }
+
+    .findings.v-ok .box-head { background: var(--ok-dim); }
+    .findings.v-partial .box-head { background: var(--partial-dim); }
+    .findings.v-false .box-head { background: var(--false-dim); }
+    .findings.v-error .box-head { background: var(--error-dim); }
+
+    .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; margin-bottom: 1.5rem; }
+    .compare .box { margin-bottom: 0; }
+    .box.expected .box-head { color: var(--ok); }
+    .box.agent .box-head { color: var(--accent); }
+
+    .block { margin-bottom: 1.5rem; }
+    .transcript { display: grid; gap: 0.85rem; }
+    .bubble {
+      max-width: min(48rem, 90%);
+      border-radius: var(--r-lg);
+      padding: 0.8rem 1.1rem 0.95rem;
+    }
+    .bubble.pola { background: var(--accent-dim); justify-self: end; border-end-end-radius: 4px; }
+    .bubble.candidate { background: var(--raised); justify-self: start; border-end-start-radius: 4px; }
+    .speaker { font-family: var(--f-read); font-size: 0.8rem; font-weight: 700; margin-bottom: 0.3rem; color: var(--muted); }
+    .bubble.pola .speaker { color: var(--accent); }
+
+    details.prompt { border-top: 1px solid var(--hair); padding-top: 1rem; direction: ltr; }
+    details.prompt summary { cursor: pointer; font-size: 0.93rem; font-weight: 600; color: var(--text-soft); min-height: 32px; }
+    details.prompt pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0.85rem 0 0;
+      font-family: var(--f-mono);
+      font-size: 0.82rem;
+      line-height: 1.6;
+      background: var(--bg-2);
+      border: 1px solid var(--hair);
+      border-radius: var(--r);
+      padding: 1rem 1.15rem;
+      color: var(--text-soft);
+    }
+
+    .status-msg { margin: 2.5rem 1.5rem; color: var(--muted); font-size: 1rem; }
+    .status-msg.err { color: var(--false); }
+
+    @media (max-width: 1280px) {
+      .insights-body { grid-template-columns: minmax(18rem, 1fr) minmax(18rem, 1.3fr); }
+      .turns-cell { display: none; }
+      .ov-cell:nth-child(2) { border-inline-end: 0; }
+    }
+
+    @media (max-width: 960px) {
+      body { overflow: auto; }
+      .page { height: auto; min-height: 100%; overflow: visible; }
+      .topbar { flex-wrap: wrap; }
+      .kpis { grid-template-columns: 1fr 1fr; }
+      .kpi { border-inline-end: 0; border-bottom: 1px solid var(--hair); }
+      .kpi-verdicts { grid-column: 1 / -1; order: 3; border-bottom: 0; }
+      .insights-body { grid-template-columns: 1fr; }
+      .ov-cell { border-inline-end: 0; border-bottom: 1px solid var(--hair); }
+      .workspace { grid-template-columns: 1fr; overflow: visible; }
+      .list-pane { border-inline-end: 0; border-bottom: 1px solid var(--hair); max-height: 20rem; }
+      .compare { grid-template-columns: 1fr; }
+      .detail-bar { position: static; }
+      .brand-sub, .keys { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <a class="brand" href="/">
+        <img class="brand-mark" src="/judy-mark.svg" width="32" height="32" alt="" aria-hidden="true" />
+        <span>
+          <span class="brand-word">Judy</span>
+          <span class="brand-sub">Report</span>
+        </span>
+      </a>
+      <div class="run-title">
+        <span class="run-name" id="runName">—</span>
+        <span class="run-meta" id="headerMeta"></span>
+      </div>
+      <span class="topbar-spacer"></span>
+      <span class="sys" role="status"><span class="led" id="statusLed"></span><span id="statusText">Loading</span></span>
+      <a class="btn" href="/"><span data-icon="arrow-left"></span>Console</a>
+      <button type="button" class="btn" id="runLogBtn" aria-pressed="false" disabled title="Loading log…"><span data-icon="list"></span>Run log</button>
+      <span id="downloadSlot"></span>
+      <button type="button" class="btn btn-icon" id="reportMore" aria-label="More actions" title="More actions"><span data-icon="more"></span></button>
+    </header>
+
+    <div class="overview hidden" id="overview">
+      <section class="kpis panel">
+        <div class="kpi kpi-main">
+          <p class="section-title" id="metricLabel">Pass rate</p>
+          <div class="readout accent"><span id="metricRate">—</span><small id="metricUnit"></small></div>
+          <div class="metric-sub" id="metricSub"></div>
+          <div class="error-reasons" id="errorReasons"></div>
+        </div>
+        <div class="kpi kpi-verdicts">
+          <p class="section-title">Verdicts</p>
+          <div class="dist-bar" id="distBar" role="img" aria-label="Verdict distribution"></div>
+          <div class="verdict-line" id="verdictLine"></div>
+        </div>
+        <div class="kpi kpi-rows">
+          <p class="section-title">Rows</p>
+          <div class="readout sm"><span id="kpiRows">0</span></div>
+          <div class="metric-sub">judged</div>
+        </div>
+      </section>
+
+      <details class="insights panel" id="insights">
+        <summary><span data-icon="chart"></span>Insights<span class="aside">verdict mix, findings, turns</span><span class="chev-icon" data-icon="chevron-down"></span></summary>
+        <div class="insights-body">
+          <div class="ov-cell">
+            <p class="section-title">Verdict mix</p>
+            <div class="donut-wrap">
+              <div class="donut">
+                <canvas id="donutChart" aria-label="Verdict distribution" role="img"></canvas>
+                <div class="donut-center"><b id="donutTotal">0</b><small>rows</small></div>
+              </div>
+              <div class="legend" id="legend"></div>
+            </div>
+          </div>
+          <div class="ov-cell">
+            <p class="section-title">Judge findings <span class="metric-sub" id="issuesScope"></span></p>
+            <div class="chart-box" id="findingsBox"><canvas id="findingsChart" aria-label="Findings by type" role="img"></canvas></div>
+            <div class="issue-grid" id="issueGrid"></div>
+          </div>
+          <div class="ov-cell turns-cell">
+            <p class="section-title">Turns per row</p>
+            <div class="chart-box"><canvas id="turnsChart" aria-label="Turns histogram" role="img"></canvas></div>
+            <div class="metric-sub" id="turnsSub"></div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="banner hidden" id="partialBanner">
+      <span class="led error"></span>
+      <span id="partialBannerText">Partial run. It was stopped before every question was judged.</span>
+    </div>
+
+    <div class="banner hidden" id="progressBanner">
+      <span class="led live"></span>
+      <span>Run in progress. Showing the last saved checkpoint.</span>
+      <button type="button" class="btn btn-sm" id="refreshBtn"><span data-icon="refresh"></span>Refresh</button>
+    </div>
+
+    <section class="runlog panel hidden" id="runLogPanel">
+      <div class="panel-head">Run log<span class="aside" id="runLogAside"></span></div>
+      <div class="panel-body" id="runLogBody"></div>
+    </section>
+
+    <div class="toolbar panel hidden" id="toolbar">
+      <div class="chips" id="chips"></div>
+      <div class="search-wrap">
+        <span data-icon="search"></span>
+        <input id="search" type="search" dir="auto" placeholder="Search question, answers, findings…" aria-label="Search rows" autocomplete="off" />
+      </div>
+      <div class="showing" id="showing"></div>
+      <div class="keys"><kbd>j</kbd> <kbd>k</kbd> move · <kbd>/</kbd> search · <kbd>esc</kbd> clear</div>
+    </div>
+
+    <div class="workspace panel hidden" id="workspace" dir="rtl">
+      <nav class="list-pane" aria-label="Eval rows">
+        <div id="rowList" role="listbox"></div>
+      </nav>
+      <main class="detail-pane" id="detailPane"></main>
+    </div>
+
+    <p class="status-msg" id="statusMessage">Loading report…</p>
+  </div>
+
+  <script src="/vendor/gsap.min.js"></script>
+  <script src="/vendor/chart.umd.min.js"></script>
+  <script src="/judy-ui.js"></script>
+  <script>
+    const J = window.Judy;
+    const runName = new URLSearchParams(location.search).get("run");
+    const $ = (id) => document.getElementById(id);
+    for (const el of document.querySelectorAll("[data-icon]")) el.outerHTML = J.icon(el.dataset.icon);
+    const runNameEl = $("runName");
+    const headerMeta = $("headerMeta");
+    const statusLed = $("statusLed");
+    const statusText = $("statusText");
+    const downloadControl = J.downloadControl("");
+    $("downloadSlot").replaceWith(downloadControl);
+    const overview = $("overview");
+    const metricLabel = $("metricLabel");
+    const metricRate = $("metricRate");
+    const metricUnit = $("metricUnit");
+    const metricSub = $("metricSub");
+    const verdictLine = $("verdictLine");
+    const kpiRows = $("kpiRows");
+    const insightsEl = $("insights");
+    const legendEl = $("legend");
+    const distBar = $("distBar");
+    const donutTotal = $("donutTotal");
+    const issueGrid = $("issueGrid");
+    const issuesScope = $("issuesScope");
+    const errorReasons = $("errorReasons");
+    const turnsSub = $("turnsSub");
+    const progressBanner = $("progressBanner");
+    const partialBanner = $("partialBanner");
+    const partialBannerText = $("partialBannerText");
+    const refreshBtn = $("refreshBtn");
+    const toolbar = $("toolbar");
+    const chipsEl = $("chips");
+    const searchEl = $("search");
+    const showingEl = $("showing");
+    const workspace = $("workspace");
+    const rowList = $("rowList");
+    const detailPane = $("detailPane");
+    const statusMessage = $("statusMessage");
+
+    const { VERDICTS, ISSUE_TYPES, escapeHtml, plural } = J;
+    const FINDING_TYPES = ["contra", "missing", "partial", "added", "note", "error"];
+    const FINDING_SIGNAL = { contra: "contra", missing: "missing", partial: "partial", added: "added", note: "note", error: "error" };
+
+    const enabledVerdicts = new Set(["PARTIAL", "FALSE", "ERROR"]);
+    let issueFilter = null;
+    let report = null;
+    let selectedKey = null;
+    let animatedMetric = false;
+    const chartState = { donut: null, findings: null, turns: null, findingTypes: [] };
+
+    if (!J.charts.available) overview.classList.add("no-charts");
+
+    /* ---------- helpers ---------- */
+
+    const currentQuery = () => searchEl.value.trim();
+    const textHtml = (raw) => J.textHtml(raw, currentQuery());
+    const renderMarkdown = (raw, opts = {}) => J.renderMarkdown(raw, { ...opts, query: currentQuery() });
+    const verdictClass = J.verdictClass;
+
+    let runLog = { lines: [], model: null, missing: true };
+    const runLogBtn = $("runLogBtn");
+    const runLogPanel = $("runLogPanel");
+    const runLogBody = $("runLogBody");
+    const runLogAside = $("runLogAside");
+
+    function buildRunLog(lines, missing) {
+      if (missing || !lines.length) return { lines: [], model: null, missing: true };
+      const model = J.createLogModel();
+      for (const entry of lines) model.ingest(entry.l, entry.s === "err" ? "stderr" : "stdout", entry.t);
+      return { lines, model, missing: false };
+    }
+
+    function stepText(step) {
+      return [step.text, step.verdict].filter(Boolean).join(" ");
+    }
+
+    function prepareRows(rows) {
+      return rows.map((row, i) => {
+        const findings = J.parseFindings(row);
+        const q = runLog.model?.questions.get(Number(row.index)) || null;
+        return {
+          ...row,
+          key: `${row.index}::${i}`,
+          bucket: J.verdictBucket(row.verdict),
+          findings,
+          counts: J.countFindings(findings),
+          q,
+          logText: q ? q.steps.map(stepText).join("\n") : "",
+        };
+      });
+    }
+
+    function questionDuration(q) {
+      if (!q || q.startedAt == null || q.endedAt == null) return "";
+      return J.formatDuration(q.endedAt - q.startedAt);
+    }
+
+    /* ---------- filtering ---------- */
+
+    function matchesQuery(row, query) {
+      if (!query) return true;
+      const hay = [row.question, row.expected, row.finalAgentAnswer, row.explanation, row.transcript, row.logText].join("\n").toLowerCase();
+      return hay.includes(query.toLowerCase());
+    }
+
+    function rowsBeforeIssueFilter() {
+      const query = currentQuery();
+      return report.rows.filter((row) => enabledVerdicts.has(row.bucket) && matchesQuery(row, query));
+    }
+
+    function filteredRows() {
+      if (!report) return [];
+      const rows = rowsBeforeIssueFilter();
+      return issueFilter ? rows.filter((row) => row.counts[issueFilter]) : rows;
+    }
+
+    function showOnly(verdict) {
+      const only = enabledVerdicts.size === 1 && enabledVerdicts.has(verdict);
+      enabledVerdicts.clear();
+      if (only) for (const v of ["PARTIAL", "FALSE", "ERROR"]) enabledVerdicts.add(v);
+      else enabledVerdicts.add(verdict);
+      issueFilter = null;
+      refreshView({ resetSelection: true });
+    }
+
+    function toggleIssue(type) {
+      issueFilter = issueFilter === type ? null : type;
+      refreshView({ resetSelection: true });
+    }
+
+    /* ---------- status ---------- */
+
+    function setSys(text, led) {
+      statusText.textContent = text;
+      statusLed.className = `led ${led || ""}`;
+    }
+
+    function showStatus(message, isError) {
+      overview.classList.add("hidden");
+      workspace.classList.add("hidden");
+      toolbar.classList.add("hidden");
+      statusMessage.classList.remove("hidden");
+      statusMessage.classList.toggle("err", Boolean(isError));
+      statusMessage.innerHTML = message;
+      setSys(isError ? "Error" : "Loading", isError ? "false" : "");
+    }
+
+    function verdictCounts() {
+      const counts = { OK: 0, PARTIAL: 0, FALSE: 0, ERROR: 0 };
+      for (const row of report.rows) counts[row.bucket] += 1;
+      return counts;
+    }
+
+    /* ---------- header ---------- */
+
+    function renderHeader() {
+      runNameEl.textContent = report.name;
+      runNameEl.title = report.name;
+      document.title = `JUDY — ${report.name}`;
+      downloadControl.setRun(report.name);
+
+      const parts = [];
+      if (report.meta?.createdAt) parts.push(`<span>${escapeHtml(J.formatTime(report.meta.createdAt))}</span>`);
+      for (const tag of report.meta?.tags || []) parts.push(`<span class="tag">${escapeHtml(tag)}</span>`);
+      headerMeta.innerHTML = parts.join("");
+
+      progressBanner.classList.toggle("hidden", !report.inProgress);
+      const isPartial = Boolean(report.partial) && !report.inProgress;
+      partialBanner.classList.toggle("hidden", !isPartial);
+      if (isPartial) {
+        const done = report.summary?.total ?? report.rows?.length ?? 0;
+        partialBannerText.textContent = report.plannedTotal
+          ? `Partial run. Stopped after ${done} of ${report.plannedTotal} questions. Only the judged rows are saved.`
+          : `Partial run. Stopped after ${done} questions. Only the judged rows are saved.`;
+      }
+      if (report.inProgress) setSys("In progress", "live");
+      else if (isPartial) setSys("Partial", "error");
+      else setSys("Complete", "ok");
+    }
+
+    /* ---------- overview ---------- */
+
+    function renderMetric(counts, total) {
+      const summary = report.summary;
+      const passRate = Number(summary?.passRate ?? (total ? (counts.OK / total) * 100 : 0));
+      const score = Number(summary?.score ?? (total ? ((counts.OK + 0.5 * counts.PARTIAL) / total) * 100 : 0));
+      const useScore = counts.PARTIAL > 0;
+      const value = useScore ? score : passRate;
+      metricLabel.textContent = useScore ? "Score" : "Pass rate";
+      metricUnit.textContent = useScore ? "score" : "pass";
+      if (!animatedMetric) {
+        metricRate.textContent = "0.0%";
+        J.motion.count(metricRate, value, { decimals: 1, suffix: "%" });
+        animatedMetric = true;
+      } else {
+        metricRate.textContent = `${value.toFixed(1)}%`;
+      }
+      metricSub.innerHTML = useScore
+        ? `<strong>${passRate.toFixed(1)}%</strong> pass · ${escapeHtml(plural(total, "question"))} judged`
+        : `${escapeHtml(plural(total, "question"))} judged`;
+      kpiRows.textContent = String(total);
+    }
+
+    function renderVerdicts(counts, total) {
+      donutTotal.textContent = String(total);
+      legendEl.innerHTML = "";
+      for (const verdict of VERDICTS) {
+        const n = counts[verdict];
+        const pct = total ? (n / total) * 100 : 0;
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `legend-item${enabledVerdicts.has(verdict) ? "" : " off"}`;
+        button.title = `Show only ${verdict}`;
+        button.innerHTML = `<span class="led ${verdictClass(verdict)}"></span><span>${verdict}</span><span class="n">${n}</span><span class="pct">${pct.toFixed(0)}%</span>`;
+        button.addEventListener("click", () => showOnly(verdict));
+        legendEl.appendChild(button);
+      }
+      verdictLine.innerHTML = VERDICTS.map(
+        (v) => `<span class="vl"><span class="led ${counts[v] ? verdictClass(v) : ""}"></span>${v} <b>${counts[v]}</b></span>`,
+      ).join("");
+      distBar.innerHTML = VERDICTS.filter((v) => counts[v])
+        .map((v) => `<span style="flex:${counts[v]} 1 0;background:var(--${verdictClass(v)})" title="${v}: ${counts[v]}"></span>`)
+        .join("");
+
+      if (!J.charts.available) return;
+      const colors = VERDICTS.map((v) => J.charts.signal(enabledVerdicts.has(v) ? verdictClass(v) : `${verdictClass(v)}-dim`));
+      const data = VERDICTS.map((v) => counts[v]);
+      if (!chartState.donut) {
+        chartState.donut = J.charts.track(
+          new Chart($("donutChart"), {
+            type: "doughnut",
+            data: { labels: VERDICTS, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: J.charts.signal("panel"), hoverOffset: 4 }] },
+            options: {
+              cutout: "72%",
+              responsive: true,
+              maintainAspectRatio: false,
+              onClick: (_e, elements) => { if (elements.length) showOnly(VERDICTS[elements[0].index]); },
+              onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? "pointer" : "default"; },
+            },
+          }),
+          (chart) => {
+            chart.data.datasets[0].borderColor = J.charts.signal("panel");
+            chart.data.datasets[0].backgroundColor = VERDICTS.map((v) => J.charts.signal(enabledVerdicts.has(v) ? verdictClass(v) : `${verdictClass(v)}-dim`));
+          },
+        );
+      } else {
+        chartState.donut.data.datasets[0].data = data;
+        chartState.donut.data.datasets[0].backgroundColor = colors;
+        chartState.donut.update();
+      }
+    }
+
+    function renderFindings() {
+      const scope = rowsBeforeIssueFilter();
+      const totals = {};
+      const rowsWith = {};
+      for (const row of scope) {
+        for (const [type, n] of Object.entries(row.counts)) {
+          totals[type] = (totals[type] || 0) + n;
+          rowsWith[type] = (rowsWith[type] || 0) + 1;
+        }
+      }
+      issuesScope.textContent = `· ${plural(scope.length, "visible row")}`;
+
+      const types = FINDING_TYPES.filter((type) => totals[type]);
+      issueGrid.innerHTML = "";
+      for (const type of types) {
+        const info = ISSUE_TYPES[type];
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `issue-filter ${info.cls}`;
+        button.setAttribute("aria-pressed", issueFilter === type ? "true" : "false");
+        button.title = `${totals[type]} findings in ${plural(rowsWith[type], "row")} — click to filter`;
+        button.innerHTML = `<strong>${totals[type]}</strong><span class="he">${info.he}</span><span class="en">${info.en}</span>`;
+        button.addEventListener("click", () => toggleIssue(type));
+        issueGrid.appendChild(button);
+      }
+      if (!types.length) issueGrid.innerHTML = `<span class="ov-empty">No findings in the visible rows.</span>`;
+      $("findingsBox").classList.toggle("hidden", !types.length);
+
+      const reasons = {};
+      for (const row of scope) {
+        if (row.bucket !== "ERROR") continue;
+        const reason = (row.findings[0]?.text || "unknown").slice(0, 60);
+        reasons[reason] = (reasons[reason] || 0) + 1;
+      }
+      const entries = Object.entries(reasons).sort((a, b) => b[1] - a[1]);
+      errorReasons.textContent = entries.length ? `Errors: ${entries.map(([r, n]) => `${r} ×${n}`).join(" · ")}` : "";
+
+      if (!J.charts.available || !types.length) return;
+      chartState.findingTypes = types;
+      const colorFor = (type) => J.charts.signal(!issueFilter || issueFilter === type ? FINDING_SIGNAL[type] : `${FINDING_SIGNAL[type]}-dim`);
+      const labels = types.map((t) => `${ISSUE_TYPES[t].en}`);
+      const data = types.map((t) => totals[t]);
+      if (!chartState.findings) {
+        chartState.findings = J.charts.track(
+          new Chart($("findingsChart"), {
+            type: "bar",
+            data: { labels, datasets: [{ data, backgroundColor: types.map(colorFor), borderRadius: 2, barThickness: 10 }] },
+            options: {
+              indexAxis: "y",
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: J.charts.signal("hair") } },
+                y: { grid: { display: false } },
+              },
+              onClick: (_e, elements) => { if (elements.length) toggleIssue(chartState.findingTypes[elements[0].index]); },
+              onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? "pointer" : "default"; },
+            },
+          }),
+          (chart) => {
+            chart.options.scales.x.grid.color = J.charts.signal("hair");
+            chart.data.datasets[0].backgroundColor = chartState.findingTypes.map(colorFor);
+          },
+        );
+      } else {
+        chartState.findings.data.labels = labels;
+        chartState.findings.data.datasets[0].data = data;
+        chartState.findings.data.datasets[0].backgroundColor = types.map(colorFor);
+        chartState.findings.update();
+      }
+    }
+
+    function renderTurns() {
+      const values = report.rows.map((row) => Number(row.turns)).filter((n) => Number.isFinite(n) && n > 0);
+      if (!values.length) {
+        turnsSub.textContent = "No turn data in this report.";
+        return;
+      }
+      const max = Math.max(...values);
+      const bins = Array.from({ length: max }, () => 0);
+      for (const n of values) bins[n - 1] += 1;
+      const avg = values.reduce((a, b) => a + b, 0) / values.length;
+      const multi = values.filter((n) => n > 1).length;
+      turnsSub.textContent = `avg ${avg.toFixed(1)} · ${multi} of ${values.length} needed follow-ups`;
+
+      if (!J.charts.available || chartState.turns) return;
+      chartState.turns = J.charts.track(
+        new Chart($("turnsChart"), {
+          type: "bar",
+          data: {
+            labels: bins.map((_, i) => String(i + 1)),
+            datasets: [{ data: bins, backgroundColor: J.charts.signal("accent-dim"), borderColor: J.charts.signal("accent"), borderWidth: 1, borderRadius: 2 }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: { grid: { display: false }, title: { display: true, text: "turns" } },
+              y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: J.charts.signal("hair") } },
+            },
+          },
+        }),
+        (chart) => {
+          chart.data.datasets[0].backgroundColor = J.charts.signal("accent-dim");
+          chart.data.datasets[0].borderColor = J.charts.signal("accent");
+          chart.options.scales.y.grid.color = J.charts.signal("hair");
+        },
+      );
+    }
+
+    function destroyCharts() {
+      for (const key of ["donut", "findings", "turns"]) {
+        if (!chartState[key]) continue;
+        J.charts.untrack(chartState[key]);
+        chartState[key].destroy();
+        chartState[key] = null;
+      }
+    }
+
+    function renderOverview() {
+      const counts = verdictCounts();
+      const total = report.rows.length;
+      renderMetric(counts, total);
+      renderVerdicts(counts, total);
+      renderFindings();
+      overview.classList.remove("hidden");
+    }
+
+    /* ---------- toolbar ---------- */
+
+    function renderChips() {
+      const counts = verdictCounts();
+      chipsEl.innerHTML = "";
+      for (const verdict of VERDICTS) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `chip ${verdictClass(verdict)}`;
+        button.innerHTML = `<span class="led ${verdictClass(verdict)}"></span>${verdict}<span class="count">${counts[verdict]}</span>`;
+        button.setAttribute("aria-pressed", enabledVerdicts.has(verdict) ? "true" : "false");
+        button.addEventListener("click", () => {
+          if (enabledVerdicts.has(verdict)) enabledVerdicts.delete(verdict);
+          else enabledVerdicts.add(verdict);
+          if (enabledVerdicts.size === 0) enabledVerdicts.add(verdict);
+          refreshView({ resetSelection: true });
+        });
+        chipsEl.appendChild(button);
+      }
+    }
+
+    /* ---------- list + detail ---------- */
+
+    function renderList(rows) {
+      rowList.innerHTML = "";
+      for (const row of rows) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `row-item v-${verdictClass(row.verdict)}`;
+        button.setAttribute("role", "option");
+        button.setAttribute("aria-selected", row.key === selectedKey ? "true" : "false");
+        const turns = row.turns != null ? plural(row.turns, "turn") : "";
+        const minis = row.bucket === "ERROR" ? "" : J.findingMinis(row.counts);
+        const duration = questionDuration(row.q);
+        const retry = row.q?.retries ? `<span class="row-retry" title="HTTP 429 retries">429 ×${row.q.retries}</span>` : "";
+        button.innerHTML = `
+          <div class="row-top">
+            <span class="row-num">#${escapeHtml(row.index)}</span>
+            <span class="row-meta">${retry}${duration ? `<span>${escapeHtml(duration)}</span>` : ""}${escapeHtml(turns)}<span class="pill ${verdictClass(row.verdict)}">${escapeHtml(row.verdict || "—")}</span></span>
+          </div>
+          <div class="row-q" dir="auto">${textHtml(String(row.question || "").replace(/\s+/g, " ").trim() || "—")}</div>
+          ${minis ? `<div class="row-issues">${minis}</div>` : ""}
+        `;
+        button.addEventListener("click", () => {
+          selectedKey = row.key;
+          refreshView();
+        });
+        rowList.appendChild(button);
+        if (row.key === selectedKey) button.scrollIntoView({ block: "nearest" });
+      }
+    }
+
+    function findingsBox(row) {
+      const klass = verdictClass(row.verdict);
+      const emptyText = String(row.explanation || "").trim() || "אין בעיות מהותיות";
+      return `
+        <section class="box findings v-${klass}">
+          <div class="box-head">
+            <span class="pill ${klass}">${escapeHtml(row.verdict || "—")}</span>
+            <span>Judge findings</span>
+            <span class="aside">${row.findings.length ? plural(row.findings.length, "item") : ""}</span>
+          </div>
+          ${J.findingsHtml(row.findings, { query: currentQuery(), emptyText })}
+        </section>
+      `;
+    }
+
+    function stepsFromConversation(row) {
+      const steps = [];
+      let agentTurn = 0;
+      let candidateTurns = 0;
+      for (const turn of J.parseTranscript(row.transcript)) {
+        if (turn.speaker === "פולה") steps.push({ kind: "agent", turn: ++agentTurn, chars: turn.text.length, at: null });
+        else if (turn.speaker === "מועמד" && candidateTurns++ > 0) steps.push({ kind: "followup", text: turn.text, at: null });
+      }
+      if (!agentTurn && String(row.finalAgentAnswer || "").trim() && row.bucket !== "ERROR") {
+        steps.push({ kind: "agent", turn: 1, chars: String(row.finalAgentAnswer).length, at: null });
+      }
+      if (row.bucket === "ERROR") steps.push({ kind: "error", stage: "run", text: row.findings[0]?.text || row.explanation || "error", at: null });
+      else if (row.verdict) steps.push({ kind: "verdict", verdict: row.verdict, at: null });
+      return steps;
+    }
+
+    function timelineBox(row) {
+      const q = row.q;
+      let aside = "";
+      let body;
+      if (runLog.missing) {
+        const steps = stepsFromConversation(row);
+        aside = "rebuilt from the saved conversation · no timings (no log recorded)";
+        body = `<ol class="timeline">${steps.map((step) => J.stepHtml(step, null)).join("")}</ol>`;
+      } else if (!q || !q.steps.length) {
+        body = `<p class="empty-state" dir="ltr">No log lines for this question.</p>`;
+      } else {
+        aside = [questionDuration(q), q.turn ? plural(q.turn, "turn") : "", q.retries ? `${q.retries} retries` : ""].filter(Boolean).join(" · ");
+        body = `<ol class="timeline">${q.steps.map((step) => J.stepHtml(step, q.startedAt)).join("")}</ol>`;
+      }
+      return `
+        <section class="box timeline-box" dir="ltr">
+          <div class="box-head"><span>Timeline</span><span class="aside">${escapeHtml(aside)}</span></div>
+          ${body}
+        </section>
+      `;
+    }
+
+    function renderRunLog() {
+      if (runLog.missing) {
+        runLogBtn.disabled = true;
+        runLogBtn.title = "No log recorded for this run";
+        runLogPanel.classList.add("hidden");
+        runLogBtn.setAttribute("aria-pressed", "false");
+        return;
+      }
+      runLogBtn.disabled = false;
+      runLogBtn.title = "Show the run's full log";
+      const { model, lines } = runLog;
+      const f = model.run.fields;
+      const first = lines.find((e) => e.t)?.t ?? null;
+      const last = [...lines].reverse().find((e) => e.t)?.t ?? null;
+      const fmtTs = (t) => (t ? new Date(t).toLocaleString() : "—");
+      const fields = [
+        ["Target", f.target],
+        ["Backend", f.backend],
+        ["Input", f.input],
+        ["Rows", model.total ? `${model.total} of ${f.loaded ?? "?"}` : f.loaded],
+        ["Concurrency", f.concurrency],
+        ["Max turns", f.maxTurns],
+        ["Judge prompt", f.prompt ? `${f.prompt}${f.promptSha ? ` · ${f.promptSha}` : ""}` : ""],
+        ["Human feedback", f.humanFeedback],
+        ["Started", fmtTs(first)],
+        ["Ended", fmtTs(last)],
+        ["Duration", first && last ? J.formatDuration(last - first) : "—"],
+      ];
+      runLogAside.textContent = `${lines.length.toLocaleString()} lines`;
+      const fatal = model.run.fatal.map((text) => `<div class="runlog-fatal">${escapeHtml(text)}</div>`).join("");
+      const notes = model.run.notes.length
+        ? `<details><summary class="section-title">Notes · ${model.run.notes.length}</summary><ul class="runlog-notes">${model.run.notes.map((n) => `<li>${escapeHtml(n.text)}</li>`).join("")}</ul></details>`
+        : "";
+      const raw = lines
+        .map((e) => {
+          const ts = e.t && first ? `<span class="ts">+${escapeHtml(J.formatDuration(e.t - first).padStart(7))} </span>` : "";
+          const line = escapeHtml(e.l).replace(/[\u0590-\u05FF][\s\S]*$/, (tail) => `<bdi dir="rtl">${tail}</bdi>`);
+          return `${ts}<span${e.s === "err" ? ' class="err"' : ""}>${line}</span>`;
+        })
+        .join("\n");
+      runLogBody.innerHTML = `
+        <div class="runlog-fields">${fields
+          .map(([k, v]) => `<div class="kv"><span class="k">${escapeHtml(k)}</span><span class="v" title="${escapeHtml(v ?? "")}">${escapeHtml(v ?? "—") || "—"}</span></div>`)
+          .join("")}</div>
+        ${fatal}
+        ${notes}
+        <details open><summary class="section-title">Raw log</summary><pre class="runlog-raw">${raw}</pre></details>
+      `;
+    }
+
+    J.menu($("reportMore"), () => [
+      {
+        label: J.theme.get() === "dark" ? "Switch to light theme" : "Switch to dark theme",
+        icon: J.theme.get() === "dark" ? "sun" : "moon",
+        onClick: () => J.theme.set(J.theme.get() === "dark" ? "light" : "dark"),
+      },
+      { separator: true },
+      {
+        label: "Delete run",
+        icon: "trash",
+        danger: true,
+        disabled: !runName,
+        onClick: async () => {
+          if (runName && (await J.deleteRun(runName))) location.href = "/";
+        },
+      },
+    ]);
+
+    // Charts are created while the section is collapsed; resize them once it opens.
+    insightsEl.addEventListener("toggle", () => {
+      if (!insightsEl.open) return;
+      for (const key of ["donut", "findings", "turns"]) chartState[key]?.resize();
+    });
+
+    runLogBtn.addEventListener("click", () => {
+      const open = runLogPanel.classList.toggle("hidden") === false;
+      runLogBtn.setAttribute("aria-pressed", open ? "true" : "false");
+      if (open) J.motion.reveal([runLogPanel], { y: 6, duration: 0.3 });
+    });
+
+    function renderDetail(row, position, total) {
+      if (!row) {
+        detailPane.innerHTML = `<p class="empty-state" dir="ltr">No rows match these filters.</p>`;
+        return;
+      }
+
+      const turns = J.parseTranscript(row.transcript);
+      const feedback = String(row.humanFeedback || "").trim();
+      const prompt = report.judgePrompt;
+      const turnsLabel = row.turns != null ? plural(row.turns, "turn") : "";
+
+      let html = `
+        <div class="detail-bar">
+          <span class="pill ${verdictClass(row.verdict)}">${escapeHtml(row.verdict || "—")}</span>
+          <span class="pos"><strong>#${escapeHtml(row.index)}</strong> · ${position} of ${total} shown${turnsLabel ? ` · ${turnsLabel}` : ""}</span>
+          <span class="nav">
+            <button type="button" class="btn" data-move="-1" ${position <= 1 ? "disabled" : ""}>${J.icon("chevron-up")}Previous</button>
+            <button type="button" class="btn" data-move="1" ${position >= total ? "disabled" : ""}>Next${J.icon("chevron-down")}</button>
+          </span>
+        </div>
+        <div class="detail-body">
+          <h2 class="question" dir="auto">${textHtml(row.question || "—")}</h2>
+          ${findingsBox(row)}
+          ${timelineBox(row)}
+      `;
+
+      if (turns.length) {
+        html += `<section class="block"><p class="section-title" dir="ltr">Conversation <span class="metric-sub">${plural(turns.length, "message")}</span></p><div class="transcript">`;
+        for (const turn of turns) {
+          const who = turn.speaker === "פולה" ? "pola" : "candidate";
+          html += `
+            <div class="bubble ${who}">
+              <div class="speaker">${escapeHtml(turn.speaker || "—")}</div>
+              <div class="md" dir="auto">${renderMarkdown(turn.text)}</div>
+            </div>
+          `;
+        }
+        html += `</div></section>`;
+      }
+
+      html += `
+          <div class="compare">
+            <section class="box expected">
+              <div class="box-head"><span>Expected · gold</span></div>
+              <div class="box-body md" dir="auto">${renderMarkdown(row.expected, { headings: true })}</div>
+            </section>
+            <section class="box agent">
+              <div class="box-head"><span>Agent final answer</span><span class="aside">${escapeHtml(turnsLabel)}</span></div>
+              <div class="box-body md" dir="auto">${renderMarkdown(row.finalAgentAnswer)}</div>
+            </section>
+          </div>
+      `;
+
+      if (feedback) {
+        html += `
+          <section class="box">
+            <div class="box-head"><span>Human feedback</span></div>
+            <div class="box-body md" dir="auto">${renderMarkdown(feedback)}</div>
+          </section>
+        `;
+      }
+
+      if (prompt) {
+        const label = [prompt.scenario, prompt.source && prompt.source !== prompt.scenario ? prompt.source : ""].filter(Boolean).join(" · ");
+        html += `
+          <details class="prompt">
+            <summary>Judge prompt${label ? ` · ${escapeHtml(label)}` : ""}</summary>
+            <pre dir="auto">${escapeHtml(prompt.text || "")}</pre>
+          </details>
+        `;
+      }
+
+      html += `</div>`;
+      detailPane.innerHTML = html;
+      detailPane.scrollTop = 0;
+      for (const button of detailPane.querySelectorAll("[data-move]")) {
+        button.addEventListener("click", () => moveSelection(Number(button.dataset.move)));
+      }
+    }
+
+    function refreshView({ resetSelection } = {}) {
+      renderChips();
+      renderOverview();
+
+      const rows = filteredRows();
+      showingEl.textContent = `showing ${rows.length} of ${report.rows.length}`;
+      if (resetSelection || !rows.some((row) => row.key === selectedKey)) {
+        selectedKey = rows[0]?.key ?? null;
+      }
+
+      const index = rows.findIndex((row) => row.key === selectedKey);
+      renderList(rows);
+      const previous = detailPane.dataset.key;
+      renderDetail(rows[index] || null, index + 1, rows.length);
+      if (previous === selectedKey) detailPane.scrollTop = Number(detailPane.dataset.scroll || 0);
+      detailPane.dataset.key = selectedKey || "";
+    }
+
+    function moveSelection(delta) {
+      const rows = filteredRows();
+      if (!rows.length) return;
+      const current = Math.max(0, rows.findIndex((row) => row.key === selectedKey));
+      const next = Math.min(rows.length - 1, Math.max(0, current + delta));
+      if (rows[next].key === selectedKey) return;
+      selectedKey = rows[next].key;
+      refreshView();
+    }
+
+    /* ---------- loading ---------- */
+
+    async function fetchReport() {
+      const response = await fetch(`/api/runs/${encodeURIComponent(runName)}/rows`);
+      const payload = await response.json().catch(() => ({}));
+      if (response.status === 409) {
+        const err = new Error(payload.error || "Report is being written, retry");
+        err.retry = true;
+        throw err;
+      }
+      if (!response.ok) {
+        const err = new Error(payload.error || `HTTP ${response.status}`);
+        err.status = response.status;
+        throw err;
+      }
+      return payload;
+    }
+
+    async function fetchLog() {
+      try {
+        const response = await fetch(`/api/runs/${encodeURIComponent(runName)}/log`);
+        if (!response.ok) return { lines: [], missing: true };
+        return await response.json();
+      } catch {
+        return { lines: [], missing: true };
+      }
+    }
+
+    async function loadReport() {
+      if (!runName) {
+        showStatus('Missing run. Open a report from the <a href="/">Judy console</a>.', true);
+        downloadControl.classList.add("hidden");
+        return;
+      }
+
+      const firstLoad = !report;
+      try {
+        const [payload, logPayload] = await Promise.all([fetchReport(), fetchLog()]);
+        runLog = buildRunLog(logPayload.lines || [], logPayload.missing);
+        report = { ...payload, rows: prepareRows(payload.rows || []) };
+      } catch (err) {
+        if (err.retry) {
+          showStatus(`${escapeHtml(err.message)}. <button type="button" class="btn btn-sm" id="retryBtn">Retry</button>`, true);
+          $("retryBtn")?.addEventListener("click", () => loadReport());
+          return;
+        }
+        const extra = err.status === 404 ? " That file is not in <code>runs/</code>." : "";
+        showStatus(`${escapeHtml(err.message)}.${extra} <a href="/">Back to the console</a>`, true);
+        return;
+      }
+
+      toolbar.classList.remove("hidden");
+      workspace.classList.remove("hidden");
+      statusMessage.classList.add("hidden");
+      if (!firstLoad) {
+        destroyCharts();
+        animatedMetric = false;
+      }
+      renderHeader();
+      renderRunLog();
+      refreshView({ resetSelection: selectedKey == null });
+      renderTurns();
+      if (firstLoad) J.motion.reveal([overview, toolbar, workspace], { y: 10, stagger: 0.08 });
+    }
+
+    function typingInField() {
+      const el = document.activeElement;
+      if (!el) return false;
+      return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable;
+    }
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && document.activeElement === searchEl) {
+        searchEl.value = "";
+        searchEl.blur();
+        refreshView({ resetSelection: true });
+        return;
+      }
+      if (event.key === "/" && !typingInField()) {
+        event.preventDefault();
+        searchEl.focus();
+        searchEl.select();
+        return;
+      }
+      if (typingInField() || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key === "j" || event.key === "ArrowDown") {
+        event.preventDefault();
+        moveSelection(1);
+      } else if (event.key === "k" || event.key === "ArrowUp") {
+        event.preventDefault();
+        moveSelection(-1);
+      }
+    });
+
+    detailPane.addEventListener("scroll", () => {
+      detailPane.dataset.scroll = String(detailPane.scrollTop);
+    });
+
+    let searchTimer = null;
+    searchEl.addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => refreshView({ resetSelection: true }), 120);
+    });
+    refreshBtn.addEventListener("click", () => loadReport());
+
+    J.theme.onChange(() => {
+      if (report) refreshView();
+    });
+    loadReport();
+  </script>
+</body>
+</html>
